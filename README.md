@@ -1,5 +1,7 @@
 # ci-triage
 
+[![CI](https://github.com/muhzuhaib/ci-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/muhzuhaib/ci-triage/actions/workflows/ci.yml)
+
 **A CI failure lands. A service reads the logs, asks an LLM what broke, and posts one comment on the
 pull request — for at most a fixed, guaranteed amount of money.**
 
