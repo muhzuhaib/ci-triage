@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ci-triage"
-version = "0.1.0"
+version = "0.2.0"
 description = "Webhook-driven CI failure triage with a hard per-run LLM spend ceiling and exactly-once side effects"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -29,6 +29,10 @@ dev = ["pytest>=8.0", "httpx>=0.27"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ci_triage"]
+# prices.json is data the package reads at runtime, not a source file. Without
+# this it is silently dropped from the wheel and the install works right up
+# until the first call is costed.
+artifacts = ["src/ci_triage/prices.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,92 @@
+{
+  "_readme": [
+    "Model prices, as data rather than as constants in code.",
+    "",
+    "Every price is a STRING, never a JSON number. json.load() turns a bare 0.75",
+    "into a float, which would reintroduce exactly the imprecision that",
+    "ci_triage.money exists to prevent. Strings parse to Decimal exactly.",
+    "",
+    "fetched_at is not decoration. A price table with no date cannot be audited,",
+    "and a silently stale table under-estimates cost -- the one direction a",
+    "budget estimate must never be wrong in. Re-check the source URLs and bump",
+    "fetched_at; do not edit prices without doing both.",
+    "",
+    "chars_per_token is the conservative characters-per-token ratio used to turn",
+    "a log into an upper bound on tokens. It is MEASURED, not assumed: see",
+    "tools/measure_token_density.py. The familiar '4 characters per token' is a",
+    "figure for English prose and understates real CI log content by up to 4.6x."
+  ],
+
+  "fetched_at": "2026-07-23",
+  "stale_after_days": 45,
+
+  "models": {
+    "gpt-5.4-nano": {
+      "provider": "openai",
+      "input_per_mtok": "0.20",
+      "output_per_mtok": "1.25",
+      "chars_per_token": "1.18",
+      "chars_per_token_basis": "measured, o200k_base worst case",
+      "source": "https://developers.openai.com/api/docs/pricing"
+    },
+    "gpt-5.4-mini": {
+      "provider": "openai",
+      "input_per_mtok": "0.75",
+      "output_per_mtok": "4.50",
+      "chars_per_token": "1.18",
+      "chars_per_token_basis": "measured, o200k_base worst case",
+      "source": "https://developers.openai.com/api/docs/pricing"
+    },
+    "gpt-5.4": {
+      "provider": "openai",
+      "input_per_mtok": "2.50",
+      "output_per_mtok": "15.00",
+      "chars_per_token": "1.18",
+      "chars_per_token_basis": "measured, o200k_base worst case",
+      "source": "https://developers.openai.com/api/docs/pricing"
+    },
+    "gpt-5.6-luna": {
+      "provider": "openai",
+      "input_per_mtok": "1.00",
+      "output_per_mtok": "6.00",
+      "chars_per_token": "1.18",
+      "chars_per_token_basis": "measured, o200k_base worst case",
+      "source": "https://developers.openai.com/api/docs/pricing"
+    },
+
+    "claude-haiku-4-5-20251001": {
+      "provider": "anthropic",
+      "input_per_mtok": "1.00",
+      "output_per_mtok": "5.00",
+      "chars_per_token": "1.18",
+      "chars_per_token_basis": "proxy: measured on OpenAI BPE. Anthropic's tokeniser is not available offline, and this model uses the pre-4.7 tokeniser",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+    },
+    "claude-sonnet-4-6": {
+      "provider": "anthropic",
+      "input_per_mtok": "3.00",
+      "output_per_mtok": "15.00",
+      "chars_per_token": "1.18",
+      "chars_per_token_basis": "proxy: measured on OpenAI BPE. Anthropic's tokeniser is not available offline, and this model uses the pre-4.7 tokeniser",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+    },
+    "claude-sonnet-5": {
+      "provider": "anthropic",
+      "input_per_mtok": "2.00",
+      "output_per_mtok": "10.00",
+      "chars_per_token": "0.90",
+      "chars_per_token_basis": "proxy 1.18 divided by the ~1.3x token increase Anthropic documents for the tokeniser used by Opus 4.7+ and Sonnet 5",
+      "price_expires": "2026-08-31",
+      "note": "Introductory pricing. $3.00/$15.00 per MTok from 2026-09-01, per the source page.",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+    },
+    "claude-opus-4-8": {
+      "provider": "anthropic",
+      "input_per_mtok": "5.00",
+      "output_per_mtok": "25.00",
+      "chars_per_token": "0.90",
+      "chars_per_token_basis": "proxy 1.18 divided by the ~1.3x token increase Anthropic documents for the tokeniser used by Opus 4.7+ and Sonnet 5",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+    }
+  }
+}
