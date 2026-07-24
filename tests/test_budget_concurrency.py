@@ -42,6 +42,12 @@ class NaiveLedger(Ledger):
     that has nothing to do with the code being correct.
     """
 
+    def __init__(self, engine, *, gap_barrier: threading.Barrier | None = None) -> None:
+        super().__init__(engine)
+        # When set, every worker waits here after reading and before writing, so
+        # all reads provably complete before any write. See the note at the gap.
+        self._gap_barrier = gap_barrier
+
     def reserve(self, run_id, amount_micros, *, attempt=1, purpose=""):  # type: ignore[override]
         # --- transaction 1: read and decide ---
         with self._engine.begin() as conn:
@@ -55,7 +61,17 @@ class NaiveLedger(Ledger):
             raise BudgetExceeded(run_id, amount_micros, remaining)
 
         # ---- the gap: every other worker reserves right here ----
-        time.sleep(0.01)
+        # A barrier here is deterministic where a sleep is a race: it holds every
+        # worker until all of them have read, so all read the same empty ledger
+        # and all decide they fit. A bare sleep only *hopes* the window stays
+        # open -- 16 serialised BEGIN IMMEDIATE reads can outlast a short sleep,
+        # letting early writes land before late reads and hiding the overspend.
+        # A control case that only sometimes demonstrates the bug has no more
+        # teeth than a guarantee test that never fails.
+        if self._gap_barrier is not None:
+            self._gap_barrier.wait()
+        else:
+            time.sleep(0.01)
 
         # --- transaction 2: write, on a decision that is now stale ---
         with self._engine.begin() as conn:
@@ -156,18 +172,23 @@ def test_the_naive_ledger_overspends__proving_this_test_has_teeth(engine):
     than four get through -- and no error is raised anywhere, which is what
     makes this bug expensive: nothing in the logs says it happened.
 
-    The *number* that gets through is not asserted, because it depends on lock
-    scheduling: SQLite serialises transactions, so some threads happen to read
-    after an earlier writer has landed and are correctly refused. That
-    scheduling detail is exactly why the overspend is a bad thing to go looking
-    for in production and a good thing to pin down with a control case here.
-    What is asserted is the invariant breach itself.
+    A barrier makes the overspend deterministic rather than merely likely. It
+    holds all 16 workers at the point between reading and writing, so every one
+    of them reads the same empty ledger before any write lands; all 16 then
+    conclude they fit against a ceiling that holds four. Relying on a bare sleep
+    instead made this test flaky -- when the serialised reads outran the sleep,
+    only four got through and the control case quietly stopped demonstrating the
+    bug. Pinning the number down is the stronger statement.
     """
-    naive = NaiveLedger(engine)
+    barrier = threading.Barrier(16)
+    naive = NaiveLedger(engine, gap_barrier=barrier)
     naive.open_run("r1", 40_000)
     granted, _refused = _hammer(naive, "r1", workers=16, amount=10_000)
 
     spend = naive.spend("r1")
-    assert len(granted) > 4, "ceiling of 40,000 fits exactly four 10,000 reservations"
+    assert len(granted) == 16, "every worker read an empty ledger and thought it fit"
+    assert spend.reserved_micros == 160_000
+    assert spend.reserved_micros > spend.ceiling_micros
+    assert spend.committed_and_held > spend.ceiling_micros
     assert spend.reserved_micros > spend.ceiling_micros
     assert spend.committed_and_held > spend.ceiling_micros
