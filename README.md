@@ -9,9 +9,10 @@ The interesting part is not the LLM call. It is that the spend ceiling is a *gua
 hope, and that the comment is posted exactly once, even though webhooks are redelivered, workers
 crash mid-run, and providers rate-limit.
 
-> **Status:** early. The budget ledger and the cost estimator that feeds it are complete and tested.
-> The webhook receiver, run state machine and GitHub client are in progress. This README documents
-> what exists; sections marked _(planned)_ do not exist yet.
+> **Status:** early. The budget ledger, the cost estimator that feeds it, and the webhook receiver
+> that admits work — signature verification and exactly-once idempotency — are complete and tested.
+> The run state machine and GitHub client are in progress. This README documents what exists;
+> sections marked _(planned)_ do not exist yet.
 
 ## The problem
 
@@ -71,6 +72,36 @@ reservation = ledger.reserve("run-42", plan.worst_case_micros, purpose="diagnose
 `plan_call` deliberately returns a **plan**, not a number: `worst_case_micros` is only an upper
 bound on the bill if the request goes out with the plan's own limits, so the cost and the parameters
 that make it true travel together instead of the caller being trusted to remember.
+
+## What is built: the webhook receiver
+
+A GitHub delivery has to be admitted before any of that runs, and admission is where two of the three
+opening problems live: an unauthenticated body, and a redelivered one.
+
+```python
+from ci_triage import IdempotencyStore, WebhookReceiver
+
+receiver = WebhookReceiver(secret=WEBHOOK_SECRET, store=IdempotencyStore(engine))
+
+result = receiver.receive(raw_body_bytes, request_headers)
+if result.should_process:
+    triage(result.event)          # first sight of this failure — do the work
+# else: authenticated but a duplicate or not a failure — acknowledged, nothing scheduled
+```
+
+`receive()` does three things in an order that is a security decision, not a convenience:
+
+1. **Authenticate the raw bytes**, before anything parses them. The HMAC is over the body exactly as
+   sent, so verification runs on the received bytes and an unauthenticated body never reaches
+   `json.loads`.
+2. **Filter to what we act on** — a `workflow_run` that *completed* with a failing conclusion.
+   Everything else is acknowledged with success and dropped, because GitHub redelivers on any non-2xx
+   and returning an error for an event we do not care about would make it retry forever.
+3. **Claim exactly once**, so a redelivery is recognised and the comment is posted a single time.
+
+It is deliberately framework-agnostic: bytes and headers in, a decision out. Binding it to FastAPI or
+any ASGI server is a dozen lines that belong with the deployment — keeping the core a pure function is
+what lets the whole admission path be tested in milliseconds with no server and no network.
 
 ### Install and run the tests in under 60 seconds
 
@@ -148,6 +179,44 @@ the size of its input — it chooses it.
 That inversion is also what makes the bound honest. Both terms of the estimate are things the
 caller controls: the input was truncated to a length we picked, and `max_tokens` on the request is a
 number we set. The estimate is arithmetic on two chosen values, not a prediction about the world.
+
+### The signature is checked on raw bytes, in constant time, and fails closed
+
+Three details in verifying GitHub's `X-Hub-Signature-256` are each a vulnerability if got wrong, not a
+style preference:
+
+- **Over the raw bytes.** The HMAC covers the body exactly as sent. Parse-then-reserialise changes the
+  bytes — key order, whitespace, unicode escaping — so a signature checked against reserialised JSON
+  never matches. This is also why authentication runs *before* `json.loads`: an unauthenticated body
+  is not handed to a parser.
+- **Constant-time comparison.** A byte-by-byte `==` returns as soon as it finds a difference, leaking
+  through timing how many leading bytes were right — enough to forge a signature one byte at a time.
+  `hmac.compare_digest` exists to close exactly that oracle, and a test asserts the comparison goes
+  through it so a refactor cannot quietly reintroduce `==`.
+- **An empty secret raises.** An unconfigured secret is not "no security", it is *forgeable* security —
+  anyone can compute an HMAC keyed by the empty string. Refusing to verify at all is safer.
+
+The legacy SHA-1 `X-Hub-Signature` header is rejected rather than accepted for compatibility; accepting
+it would let a caller downgrade the check to a broken hash.
+
+### Idempotency is keyed on the event, not the delivery — and the key includes the attempt
+
+Exactly-once rests on the same move as the ledger: a single `INSERT` of the key is the claim, and the
+primary-key constraint arbitrates the race under the row lock. A read-first "have I seen this?" is the
+check-then-act double-post again, invisible to single-threaded tests — so
+`tests/test_idempotency_concurrency.py` races real threads and carries a naive store as a control that
+double-claims, proving the harness has teeth.
+
+Two choices in *what* the key is made of:
+
+- **The event, not the envelope.** GitHub's `X-GitHub-Delivery` GUID is documented only as identifying
+  "the event", with no guarantee a redelivery reuses it — so keying on it could let a redelivery
+  through as new. The key is derived from what happened
+  (`workflow_run:<repo>:<run_id>:<run_attempt>:<action>`), which is stable across redeliveries by
+  construction, whatever the envelope does.
+- **`run_attempt` is in the key.** GitHub's "re-run failed jobs" reuses the same `workflow_run.id` and
+  only bumps `run_attempt`. A key without it would dedupe a genuine re-run against the original failure,
+  and the re-run would never be triaged.
 
 ### The price table is dated data, not constants in code
 
@@ -257,7 +326,7 @@ architecture is: gateway as the org-level backstop, per-run policy in the servic
 
 - [x] Per-run spend ledger with atomic reservation, commit, release
 - [x] Worst-case cost estimation from a dated model price table
-- [ ] Webhook receiver with signature verification and idempotency keys _(planned)_
+- [x] Webhook receiver with signature verification and idempotency keys
 - [ ] Run state machine: retries with backoff, dead-letter queue, replay _(planned)_
 - [ ] GitHub log fetch, log truncation to fit the ceiling, comment posting _(planned)_
 - [ ] Failure-injection suite: redelivery, worker kill, provider 429s, oversized logs _(planned)_
