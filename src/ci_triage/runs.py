@@ -9,7 +9,10 @@ Four decisions shape everything below.
 
 **1. The claim is a conditional write, not a query.** Postgres has
 ``SELECT ... FOR UPDATE SKIP LOCKED``, which is the natural answer to "hand one
-job to exactly one worker" -- and SQLite has nothing like it. Since the
+job to exactly one worker" -- and SQLite has nothing like it: 3.50.4 answers that
+statement with ``OperationalError: near "FOR": syntax error``, and there is no
+weaker form of it to fall back to either, since plain ``FOR UPDATE`` is rejected
+in the same place. Measured, not assumed, because the design turns on it. Since the
 guarantee has to hold on both backends, the claim here is an ``UPDATE`` whose
 ``WHERE`` clause re-asserts every condition that made the job runnable, and
 whose ``rowcount`` *is* the verdict. The ``SELECT`` that precedes it only
