@@ -9,10 +9,10 @@ The interesting part is not the LLM call. It is that the spend ceiling is a *gua
 hope, and that the comment is posted exactly once, even though webhooks are redelivered, workers
 crash mid-run, and providers rate-limit.
 
-> **Status:** early. The budget ledger, the cost estimator that feeds it, and the webhook receiver
-> that admits work — signature verification and exactly-once idempotency — are complete and tested.
-> The run state machine and GitHub client are in progress. This README documents what exists;
-> sections marked _(planned)_ do not exist yet.
+> **Status:** early. Complete and tested: the budget ledger, the cost estimator that feeds it, the
+> webhook receiver that admits work (signature verification and exactly-once idempotency), and the run
+> state machine that retries, buries and replays it. The GitHub client is next. This README documents
+> what exists; sections marked _(planned)_ do not exist yet.
 
 ## The problem
 
@@ -102,6 +102,39 @@ if result.should_process:
 It is deliberately framework-agnostic: bytes and headers in, a decision out. Binding it to FastAPI or
 any ASGI server is a dozen lines that belong with the deployment — keeping the core a pure function is
 what lets the whole admission path be tested in milliseconds with no server and no network.
+
+## What is built: the run state machine
+
+Admission decides whether to work on a failure. The state machine decides what happens when the work
+itself fails, which it will: providers return 429, log downloads time out, workers get killed
+mid-attempt, and some failures will never succeed no matter how often they are retried.
+
+```python
+from ci_triage import IdempotencyStore, JobStore, process_next
+
+jobs = JobStore(engine, max_attempts=3)
+jobs.enqueue(result.event.idempotency_key, result.event.ledger_run_id)
+
+# ...in each worker process, in a loop:
+process_next(jobs, triage, worker="worker-3", idempotency=IdempotencyStore(engine))
+```
+
+A job is `pending`, `running`, `succeeded` or `dead_letter`. A job waiting out a backoff is `pending`
+with a future due time rather than a state of its own, because two states that both mean "will run
+again" have to be kept in step by every query that asks what is runnable, and one of them eventually
+is not.
+
+What the machine guarantees, and how each guarantee is tested:
+
+| Guarantee | Mechanism | Test |
+|---|---|---|
+| One job goes to exactly one worker | conditional `UPDATE`; the row count is the verdict | 16 threads race one job |
+| A crashed worker's job is retried | leases with an expiry; a lapsed lease is reclaimable | reclaim races 16 threads |
+| A crashed worker's job is not immortal | the call that would retry it buries it when no attempts remain | lease lapses on the final attempt |
+| A revived worker cannot overwrite the attempt that replaced it | `(worker, attempt)` fencing token on every write | stolen lease, stale write refused |
+| Retries do not multiply the cost ceiling | every attempt spends from the one run budget | budget failure is terminal on attempt 1 |
+| A hopeless failure is not retried three times first | failures classified retryable or terminal | `BudgetExceeded` goes straight to the queue |
+| Replay grants attempts, not money | `max_attempts` is raised; `attempt` and the ceiling are untouched | replay, then claim, then succeed |
 
 ### Install and run the tests in under 60 seconds
 
@@ -218,6 +251,66 @@ Two choices in *what* the key is made of:
   only bumps `run_attempt`. A key without it would dedupe a genuine re-run against the original failure,
   and the re-run would never be triaged.
 
+### The queue claim is a conditional write, because `SKIP LOCKED` is not portable
+
+Postgres has `SELECT ... FOR UPDATE SKIP LOCKED`, which is the natural way to hand one queued job to
+exactly one worker. SQLite has nothing like it, and this project's guarantees are meant to hold on the
+database people actually deploy on *and* on the one that makes the tests free to run.
+
+So the claim is the same move as the ledger's reservation. A `SELECT` nominates candidate rows and
+decides nothing, then an `UPDATE` re-asserts every condition that made the row runnable, and its row
+count is the verdict. A worker that loses the race for one candidate simply tries the next.
+`tests/test_runs_concurrency.py` races 16 threads at one job, and carries a naive store whose `UPDATE`
+is guarded on the primary key alone, on the reasonable-sounding grounds that it just checked the row
+was pending. All 16 workers win that one, which is 16 identical comments on somebody's pull request.
+
+### A lease is not a mutex, so `attempt` is a fencing token
+
+A worker holds a job for a lease period; if it dies, the lease lapses and another worker takes over.
+The hazard is that a dead worker and a paused one look identical from the outside. The original can
+wake up after its job has been handed on, and if the store trusted the job object it was handed, that
+late write would overwrite the outcome of the attempt that replaced it. With the idempotency key then
+marked completed, the stale result would be replayed to every redelivery afterwards.
+
+The claim increments `attempt`, and every write is guarded on `(worker, attempt)`. A revived worker's
+write matches no rows and is reported back to it as a lost lease. This is also what un-sticks the
+crashed-mid-processing case the idempotency store deliberately left open: no timeout on the key is
+needed, because the job is the thing that gets retried, not the key.
+
+### A retry that cannot succeed is a delay plus a bill
+
+Failures are classified retryable or terminal, and terminal ones go straight to the dead-letter queue
+without spending the retry budget or waiting out a backoff. `BudgetExceeded` is the important member of
+that set: the ceiling does not grow, so a call that did not fit will never fit. For a service whose
+entire premise is a per-run cost ceiling, retrying past it would be the one unforgivable bug.
+
+Unrecognised exceptions default to retryable, and that direction is deliberate. An unknown transient
+error retried three times costs three attempts; an unknown transient error buried on sight costs a
+diagnosis nobody gets.
+
+Backoff is exponential with a cap and **full** jitter, meaning the delay is randomised over the whole
+interval rather than nudged by a few per cent. The failures that cause retries are usually shared, such
+as a provider rate-limiting everyone at once, so without jitter every worker computes the same delay
+from the same clock and the herd re-forms on every attempt.
+
+### Retries share the run's ceiling, and a replay does not raise it
+
+The receiver scopes a ledger run to one CI run attempt and leaves this question open on purpose. The
+answer is that every triage attempt for an event spends from the same ceiling, because otherwise "retry
+up to three times" quietly multiplies the cost cap by three and the guarantee is decoration.
+
+Replay follows from that. Taking a job out of the dead-letter queue grants further attempts by raising
+`max_attempts`; it grants no further money. A job that died broke will fail at its first reservation and
+come straight back, which is the correct outcome arrived at in one second instead of after three
+backoffs. `attempt` is never reset either: how many times the job has really run is a fact, and a
+replayed job should read honestly in the table rather than looking like one that has never had trouble.
+
+### The dead-letter queue is a state, not a table
+
+A separate `dead_letters` table means copying the row, and two copies of one job's truth will
+eventually disagree about which is current. The queue is a view over `state = 'dead_letter'`, ordered by
+when each job got there, so replay is one state transition on the row that was already there.
+
 ### The price table is dated data, not constants in code
 
 `prices.json` carries `fetched_at` and a per-entry `source` URL, so "where did this number come from
@@ -327,7 +420,7 @@ architecture is: gateway as the org-level backstop, per-run policy in the servic
 - [x] Per-run spend ledger with atomic reservation, commit, release
 - [x] Worst-case cost estimation from a dated model price table
 - [x] Webhook receiver with signature verification and idempotency keys
-- [ ] Run state machine: retries with backoff, dead-letter queue, replay _(planned)_
+- [x] Run state machine: retries with backoff, dead-letter queue, replay
 - [ ] GitHub log fetch, log truncation to fit the ceiling, comment posting _(planned)_
 - [ ] Failure-injection suite: redelivery, worker kill, provider 429s, oversized logs _(planned)_
 - [ ] `docker compose up` _(planned)_
