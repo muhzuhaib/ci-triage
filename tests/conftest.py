@@ -6,7 +6,13 @@ import pytest
 from sqlalchemy import delete
 
 from ci_triage.budget import Ledger
-from ci_triage.schema import create_all, idempotency_keys, reservations, run_budgets
+from ci_triage.schema import (
+    create_all,
+    idempotency_keys,
+    reservations,
+    run_budgets,
+    triage_jobs,
+)
 from ci_triage.schema import create_engine_for
 
 #: Point this at a Postgres instance to run the whole suite against it.
@@ -30,7 +36,7 @@ def engine(tmp_path):
         create_all(eng)
         # Shared database, so clear it rather than recreating it per test.
         with eng.begin() as conn:
-            for table in (idempotency_keys, reservations, run_budgets):
+            for table in (triage_jobs, idempotency_keys, reservations, run_budgets):
                 conn.execute(delete(table))
     else:
         eng = create_engine_for(f"sqlite:///{tmp_path / 'test.db'}")

@@ -73,6 +73,37 @@ idempotency_keys = Table(
 )
 
 
+#: One row per triage job: the unit the state machine retries, buries and
+#: replays. ``idempotency_key`` is unique, so the job cannot be created twice for
+#: one event however many times a delivery is retried -- the same constraint
+#: argument as ``idempotency_keys`` itself. ``attempt`` doubles as a fencing
+#: token: it is incremented by the claim, so a worker whose lease expired can be
+#: told its write is stale. See :mod:`ci_triage.runs`.
+triage_jobs = Table(
+    "triage_jobs",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("idempotency_key", String(255), nullable=False, unique=True),
+    Column("run_id", String(128), nullable=False),
+    Column("state", String(16), nullable=False),
+    Column("attempt", Integer, nullable=False, default=0),
+    Column("max_attempts", Integer, nullable=False),
+    Column("next_attempt_at", DateTime(timezone=True), nullable=False),
+    Column("lease_expires_at", DateTime(timezone=True), nullable=True),
+    Column("worker", String(64), nullable=True),
+    Column("last_error", Text, nullable=True),
+    Column("result", Text, nullable=True),
+    Column("replays", Integer, nullable=False, default=0),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+#: The claim query asks for runnable work: one state, ordered by due time. Both
+#: columns are in the index because the ordering is part of the query, not a
+#: presentation detail -- an index on ``state`` alone would leave a sort behind.
+Index("ix_triage_jobs_runnable", triage_jobs.c.state, triage_jobs.c.next_attempt_at)
+
+
 def create_engine_for(url: str, **kwargs: object) -> Engine:
     """Build an engine with the settings each backend needs to be correct.
 
