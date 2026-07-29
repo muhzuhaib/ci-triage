@@ -44,6 +44,12 @@ class NaiveStore(IdempotencyStore):
     test below can show the harness catches a double-claim.
     """
 
+    def __init__(self, engine, *, gap_barrier: threading.Barrier | None = None) -> None:
+        super().__init__(engine)
+        # When set, every worker waits here after reading and before inserting,
+        # so all reads provably complete before any insert. See the gap below.
+        self._gap_barrier = gap_barrier
+
     def claim(self, key: str, run_id: str) -> Claim:  # type: ignore[override]
         # --- transaction 1: look, and decide ownership from what we saw ---
         with self._engine.begin() as conn:
@@ -54,14 +60,22 @@ class NaiveStore(IdempotencyStore):
             return Claim(DUPLICATE_IN_FLIGHT)
 
         # ---- the gap: every other barrier-released worker also read "absent" ----
-        # This sleep is the real work -- fetch logs, call the LLM, post the
+        # This stands in for the real work -- fetch logs, call the LLM, post the
         # comment -- which happens *after* deciding we are first and *before*
-        # recording it. It also releases the SQLite write lock so that every
-        # racer gets through the read above, the way genuinely concurrent
-        # transactions do on Postgres. Without it, SQLite's BEGIN IMMEDIATE
-        # serialises the threads so completely that the gap never opens and the
-        # bug hides -- the exact hazard the ledger's naive control documents.
-        time.sleep(0.02)
+        # recording it.
+        #
+        # A barrier here is deterministic where a sleep is a race, for the same
+        # reason spelled out in the ledger's naive control: SQLite's
+        # ``BEGIN IMMEDIATE`` serialises the reads, so with a bare sleep the
+        # early workers can insert before the late workers have read, the window
+        # closes, and the control case fails to demonstrate the bug it exists to
+        # demonstrate. The barrier holds every worker until all sixteen have read
+        # the same "absent", which is the interleaving Postgres produces
+        # naturally under genuinely concurrent transactions.
+        if self._gap_barrier is not None:
+            self._gap_barrier.wait()
+        else:
+            time.sleep(0.02)
 
         # We have already decided we are first. The insert below is treated as
         # mere record-keeping, and its failure as nothing to worry about.
@@ -130,8 +144,12 @@ def test_the_naive_store_double_claims__proving_this_test_has_teeth(engine):
     More than one FIRST means more than one comment would be posted -- the exact
     outcome the store exists to prevent -- and, as with the ledger, nothing is
     raised to announce it.
+
+    The gap barrier makes that certain rather than likely: every worker reads
+    before any worker inserts, on both backends, every run.
     """
-    naive = NaiveStore(engine)
-    firsts, _others, _errors = _race(naive, "hot-key", workers=16)
+    workers = 16
+    naive = NaiveStore(engine, gap_barrier=threading.Barrier(workers))
+    firsts, _others, _errors = _race(naive, "hot-key", workers=workers)
 
     assert len(firsts) > 1, "the read-first store must let more than one caller win"
