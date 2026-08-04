@@ -14,6 +14,7 @@ from .idempotency import (
     IdempotencyError,
     IdempotencyStore,
 )
+from .logs import LogSection, PreparedLog, prepare_log, strip_timestamps, tail_to_chars
 from .money import dollars_to_micros, format_micros, micros_to_dollars
 from .pricing import ExpiredPrice, ModelPrice, PriceTable, UnknownModel, load_prices
 from .runs import (
@@ -44,9 +45,16 @@ from .webhook import (
     WebhookError,
     WebhookReceiver,
     WorkflowRunEvent,
+    parse_ledger_run_id,
 )
 
-__version__ = "0.2.0"
+# ci_triage.github and ci_triage.triage are deliberately NOT imported here. They
+# need an HTTP client, and the point of the core being SQLAlchemy-only is that
+# importing this package cannot drag one in. Import them directly:
+#
+#     from ci_triage.github import GitHubClient
+
+__version__ = "0.3.0"
 
 __all__ = [
     "Backoff",
@@ -61,9 +69,11 @@ __all__ = [
     "JobError",
     "JobStore",
     "Ledger",
+    "LogSection",
     "MissingSignature",
     "ModelPrice",
     "NotDeadLettered",
+    "PreparedLog",
     "PriceTable",
     "ProcessOutcome",
     "ReceiveResult",
@@ -91,9 +101,13 @@ __all__ = [
     "load_prices",
     "micros_to_dollars",
     "no_jitter",
+    "parse_ledger_run_id",
     "plan_call",
     "plan_call_for_text",
+    "prepare_log",
     "process_next",
+    "strip_timestamps",
+    "tail_to_chars",
     "upper_bound_tokens",
     "verify_signature",
 ]
