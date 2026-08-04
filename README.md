@@ -10,9 +10,10 @@ hope, and that the comment is posted exactly once, even though webhooks are rede
 crash mid-run, and providers rate-limit.
 
 > **Status:** early. Complete and tested: the budget ledger, the cost estimator that feeds it, the
-> webhook receiver that admits work (signature verification and exactly-once idempotency), and the run
-> state machine that retries, buries and replays it. The GitHub client is next. This README documents
-> what exists; sections marked _(planned)_ do not exist yet.
+> webhook receiver that admits work (signature verification and exactly-once idempotency), the run
+> state machine that retries, buries and replays it, and the GitHub side that reads the failed jobs'
+> logs and posts the answer. The failure-injection suite is next. This README documents what exists;
+> sections marked _(planned)_ do not exist yet.
 
 ## The problem
 
@@ -147,7 +148,115 @@ python -m pytest
 No services, no API keys, no network. The ledger's dependency is SQLAlchemy and nothing else, which
 is deliberate — the guarantees are the part worth verifying, so verifying them has to be free.
 
+## What is built: the GitHub side
+
+Reading the logs and posting the answer is where the budget stops being arithmetic and starts
+buying something.
+
+```python
+from ci_triage.github import GitHubClient
+from ci_triage.triage import make_handler
+
+handler = make_handler(
+    client=GitHubClient(GITHUB_TOKEN),
+    ledger=ledger,
+    price=load_prices().get("claude-haiku-4-5-20251001"),
+    diagnose=ask_your_provider,      # (prompt, plan) -> Diagnosis(text, cost_micros)
+)
+
+process_next(jobs, handler, worker="worker-3", idempotency=IdempotencyStore(engine))
+```
+
+The order inside the handler is the design:
+
+```
+coordinates -> failed jobs -> what can we afford -> fetch and truncate
+            -> reserve the worst case -> ask -> commit the truth -> post one comment
+```
+
+The provider is an injected callable. This package never picks a vendor, never holds an API key and
+never calls one, which is also what lets the whole path above be tested without an account: the
+tests run it end to end against `httpx.MockTransport` and a `diagnose` that returns whatever cost
+the test needs it to.
+
+### Only the failed jobs are read, and their timestamps are thrown away first
+
+The whole-run log endpoint returns a zip of every job, which on a green-except-one matrix is mostly
+logs of things that worked. The jobs list carries each job's `conclusion`, so the failures are named
+first and fetched one at a time.
+
+Then every line of what comes back is prefixed with `2026-07-29T23:12:55.4607494Z `, and dropping
+that prefix is the single largest thing that can be done for the size of the prompt. Measured on a
+real 547-line job log from this repository's own CI, committed at
+`tools/samples/actions-job.log` so the number can be checked
+(`python tools/measure_timestamp_cost.py`):
+
+| | chars | tokens | chars/token |
+|---|---|---|---|
+| raw | 58,853 | 24,387 | 2.41 |
+| timestamps stripped | 42,990 | 14,838 | 2.90 |
+
+The prefixes are **27% of the characters but 39% of the tokens**, because a run of digits and
+punctuation tokenises worse than the English and code around it. The same budget therefore buys
+**1.64x more real log** once they are gone.
+
+What is left is truncated from the front, because a CI log opens with runner provisioning and
+dependency resolution, which are identical on the runs that pass, and ends with the failing
+assertion, which is not. Several failed jobs share the budget by water filling: equal shares, and a
+job whose log is smaller than its share returns the remainder to the ones still over. The per-job
+headers and the note saying what was dropped are counted inside the ceiling rather than added on
+top, because a bound exceeded by the machinery announcing the bound is not a bound.
+
+### The comment is identified by a marker inside itself
+
+Creating a comment has no idempotency key, so "post exactly once" is not something the API can be
+asked for. Every comment therefore carries an invisible HTML marker naming the run, and posting
+means upserting: find the marker, edit that comment, or create one if there is none. A redelivery
+lands as an edit rather than a second opinion underneath the first.
+
+**The honest limitation:** find-then-create is a check-then-act race, and unlike the ledger and the
+queue there is no conditional write available to close it. What makes it safe in practice is the
+lease, which means one worker is doing this at a time. What the marker guarantees on its own is
+recovery, not exclusion.
+
 ## Design decisions
+
+### The log redirect is followed by hand, without the token
+
+`GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs` answers `302` with a `Location` pointing at a
+storage host, and [the documentation](https://docs.github.com/en/rest/actions/workflow-jobs) notes
+the link expires after one minute. Letting the HTTP client follow that automatically means trusting
+its redirect policy not to forward the `Authorization` header to a third party. Some clients strip
+it across origins and some do not, and a credential leak is not a thing to hold by convention, so
+the redirect is read and re-issued explicitly with no auth header at all. A test asserts the second
+request carries none, so a later refactor to `follow_redirects=True` cannot quietly undo it.
+
+### The server's `retry-after` outranks our own backoff
+
+A `403` or `429` from GitHub can mean the primary or the secondary rate limit, so the response
+headers decide rather than the status code: `retry-after`, or `x-ratelimit-reset` when
+`x-ratelimit-remaining` is `0`. GitHub
+[states plainly](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api)
+that continuing to call while limited can get an integration banned, so a locally computed backoff
+that happens to be shorter is not an opinion worth having. The exception carries the number, and the
+state machine reads it off the exception without importing anything HTTP, which is what keeps the
+queue free of a dependency on whichever client raised it.
+
+Jitter is then *added* to the server's delay rather than applied across it. Full jitter over
+`[0, delay]` would put most of the herd back inside the window the server just closed.
+
+### A 404 is buried, a 502 is retried, and the exception type says which
+
+The client raises two families: transient ones for timeouts, 5xx and rate limits, and permanent ones
+that subclass the state machine's `TerminalError`. The classifier in `runs.py` therefore needs no
+knowledge of HTTP to do the right thing, and a repository that no longer exists is not retried three
+times with backoff before anyone admits it.
+
+### A diagnosis that cannot be posted is still recorded
+
+If the run has no pull request to comment on, which is normal for a push to a branch nobody has
+opened one for, the answer is stored as the job's result and the job succeeds. Dead-lettering there
+would throw away something already paid for, and a redelivery would buy it again.
 
 ### Reserve the worst case, then reconcile
 
@@ -421,7 +530,7 @@ architecture is: gateway as the org-level backstop, per-run policy in the servic
 - [x] Worst-case cost estimation from a dated model price table
 - [x] Webhook receiver with signature verification and idempotency keys
 - [x] Run state machine: retries with backoff, dead-letter queue, replay
-- [ ] GitHub log fetch, log truncation to fit the ceiling, comment posting _(planned)_
+- [x] GitHub log fetch, log truncation to fit the ceiling, comment posting
 - [ ] Failure-injection suite: redelivery, worker kill, provider 429s, oversized logs _(planned)_
 - [ ] `docker compose up` _(planned)_
 
