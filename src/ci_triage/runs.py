@@ -436,12 +436,22 @@ class JobStore:
         error: str,
         *,
         retryable: bool = True,
+        retry_after: float | None = None,
         now: datetime | None = None,
     ) -> str:
         """Record a failed attempt and decide what happens next.
 
         Returns :data:`RETRY_SCHEDULED`, :data:`DEAD_LETTERED` or
         :data:`LEASE_LOST`.
+
+        ``retry_after`` is a delay the *server* asked for, and it overrides the
+        computed backoff rather than competing with it. GitHub documents a
+        ``retry-after`` header on a rate-limited response and states plainly
+        that continuing to call while limited can get an integration banned, so
+        a locally computed schedule that happens to be shorter is not an
+        opinion worth having. Jitter is then added on top instead of applied to
+        the whole interval: full jitter would spread retries over ``[0, delay]``
+        and put most of the herd back inside the window the server closed.
         """
         moment = now or _now()
         exhausted = job.attempt >= job.max_attempts
@@ -465,7 +475,10 @@ class JobStore:
                 )
             return DEAD_LETTERED if written.rowcount == 1 else LEASE_LOST
 
-        delay = self._backoff.delay_for(job.attempt)
+        if retry_after is None:
+            delay = self._backoff.delay_for(job.attempt)
+        else:
+            delay = max(0.0, retry_after) + self._backoff.jitter(self._backoff.base_seconds)
         with self._engine.begin() as conn:
             written = conn.execute(
                 update(triage_jobs)
@@ -610,8 +623,16 @@ def process_next(
         result = handler(job)
     except Exception as exc:  # noqa: BLE001 - classified below, never swallowed
         error = f"{type(exc).__name__}: {exc}"
+        # Read duck-typed rather than imported: an exception that knows when the
+        # server will accept work again should be able to say so without this
+        # module growing a dependency on whichever client raised it.
+        retry_after = getattr(exc, "retry_after_seconds", None)
         outcome = store.fail(
-            job, error, retryable=is_retryable(exc), now=now or _now()
+            job,
+            error,
+            retryable=is_retryable(exc),
+            retry_after=retry_after if isinstance(retry_after, (int, float)) else None,
+            now=now or _now(),
         )
         if outcome == DEAD_LETTERED and idempotency is not None:
             idempotency.complete(job.idempotency_key, f"dead-lettered: {error}")
