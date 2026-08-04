@@ -1,0 +1,547 @@
+﻿2026-07-29T23:12:55.4607494Z Current runner version: '2.336.0'
+2026-07-29T23:12:55.4633402Z ##[group]Runner Image Provisioner
+2026-07-29T23:12:55.4634325Z Hosted Compute Agent
+2026-07-29T23:12:55.4635025Z Version: 20260707.563
+2026-07-29T23:12:55.4635745Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+2026-07-29T23:12:55.4636790Z Build Date: 2026-07-07T19:33:50Z
+2026-07-29T23:12:55.4637609Z Worker ID: {5022927e-f2dc-4bf8-ba92-cc14f7038cf0}
+2026-07-29T23:12:55.4638359Z Azure Region: eastus2
+2026-07-29T23:12:55.4638936Z ##[endgroup]
+2026-07-29T23:12:55.4640599Z ##[group]Operating System
+2026-07-29T23:12:55.4641261Z Ubuntu
+2026-07-29T23:12:55.4641878Z 24.04.4
+2026-07-29T23:12:55.4642651Z LTS
+2026-07-29T23:12:55.4643212Z ##[endgroup]
+2026-07-29T23:12:55.4643850Z ##[group]Runner Image
+2026-07-29T23:12:55.4644529Z Image: ubuntu-24.04
+2026-07-29T23:12:55.4645115Z Version: 20260726.254.1
+2026-07-29T23:12:55.4646507Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260726.254/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-29T23:12:55.4648487Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260726.254
+2026-07-29T23:12:55.4649600Z ##[endgroup]
+2026-07-29T23:12:55.4650894Z ##[group]GITHUB_TOKEN Permissions
+2026-07-29T23:12:55.4653427Z Contents: read
+2026-07-29T23:12:55.4654074Z Metadata: read
+2026-07-29T23:12:55.4654792Z Packages: read
+2026-07-29T23:12:55.4655378Z ##[endgroup]
+2026-07-29T23:12:55.4657961Z Secret source: Actions
+2026-07-29T23:12:55.4659518Z Prepare workflow directory
+2026-07-29T23:12:55.5078991Z Prepare all required actions
+2026-07-29T23:12:55.5127166Z Getting action download info
+2026-07-29T23:12:55.7023034Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-07-29T23:12:55.8512870Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-07-29T23:12:56.0411773Z Complete job name: tests (postgres)
+2026-07-29T23:12:56.0907407Z ##[group]Checking docker version
+2026-07-29T23:12:56.0920688Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-07-29T23:12:56.1557867Z '1.48'
+2026-07-29T23:12:56.1569295Z Docker daemon API version: '1.48'
+2026-07-29T23:12:56.1570060Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-07-29T23:12:56.1729991Z '1.48'
+2026-07-29T23:12:56.1744188Z Docker client API version: '1.48'
+2026-07-29T23:12:56.1749058Z ##[endgroup]
+2026-07-29T23:12:56.1751495Z ##[group]Clean up resources from previous jobs
+2026-07-29T23:12:56.1757217Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=48a3d2"
+2026-07-29T23:12:56.2010710Z ##[command]/usr/bin/docker network prune --force --filter "label=48a3d2"
+2026-07-29T23:12:56.2143124Z ##[endgroup]
+2026-07-29T23:12:56.2143640Z ##[group]Create local container network
+2026-07-29T23:12:56.2153112Z ##[command]/usr/bin/docker network create --label 48a3d2 github_network_445673adf1644b63904e6265788e913b
+2026-07-29T23:12:56.2643956Z f4c2d5e94d381f2f95dc8e78e6f531857a3592c830a38d820f4db2afc950ace4
+2026-07-29T23:12:56.2659717Z ##[endgroup]
+2026-07-29T23:12:56.2684591Z ##[group]Starting postgres service container
+2026-07-29T23:12:56.2706100Z ##[command]/usr/bin/docker pull postgres:16
+2026-07-29T23:12:56.5685205Z 16: Pulling from library/postgres
+2026-07-29T23:12:56.6545760Z 062e450697fa: Pulling fs layer
+2026-07-29T23:12:56.6546932Z c68b4bd1f4db: Pulling fs layer
+2026-07-29T23:12:56.6548208Z d05a3039bf71: Pulling fs layer
+2026-07-29T23:12:56.6549108Z 16a6273f39e4: Pulling fs layer
+2026-07-29T23:12:56.6549910Z 2f0a4cdcb4a0: Pulling fs layer
+2026-07-29T23:12:56.6550678Z 16a6273f39e4: Waiting
+2026-07-29T23:12:56.6551155Z 0991be5ba967: Pulling fs layer
+2026-07-29T23:12:56.6551671Z 7b78d2f26598: Pulling fs layer
+2026-07-29T23:12:56.6552434Z 7f9e3a85794c: Pulling fs layer
+2026-07-29T23:12:56.6552948Z cb52fa00305a: Pulling fs layer
+2026-07-29T23:12:56.6553461Z 98d8c18b5328: Pulling fs layer
+2026-07-29T23:12:56.6554026Z 115bb5c8bb8b: Pulling fs layer
+2026-07-29T23:12:56.6554531Z ed3f4fc92f94: Pulling fs layer
+2026-07-29T23:12:56.6555356Z 55e69f401030: Pulling fs layer
+2026-07-29T23:12:56.6555847Z 971d8ffba74c: Pulling fs layer
+2026-07-29T23:12:56.6556324Z 0991be5ba967: Waiting
+2026-07-29T23:12:56.6556761Z 7b78d2f26598: Waiting
+2026-07-29T23:12:56.6557196Z 2f0a4cdcb4a0: Waiting
+2026-07-29T23:12:56.6557628Z 7f9e3a85794c: Waiting
+2026-07-29T23:12:56.6558059Z ed3f4fc92f94: Waiting
+2026-07-29T23:12:56.6558489Z cb52fa00305a: Waiting
+2026-07-29T23:12:56.6558918Z 55e69f401030: Waiting
+2026-07-29T23:12:56.6559337Z 98d8c18b5328: Waiting
+2026-07-29T23:12:56.6559761Z 971d8ffba74c: Waiting
+2026-07-29T23:12:56.6560187Z 115bb5c8bb8b: Waiting
+2026-07-29T23:12:56.7418248Z c68b4bd1f4db: Verifying Checksum
+2026-07-29T23:12:56.7419471Z c68b4bd1f4db: Download complete
+2026-07-29T23:12:56.8027189Z d05a3039bf71: Verifying Checksum
+2026-07-29T23:12:56.8032612Z d05a3039bf71: Download complete
+2026-07-29T23:12:56.8323198Z 16a6273f39e4: Verifying Checksum
+2026-07-29T23:12:56.8324160Z 16a6273f39e4: Download complete
+2026-07-29T23:12:56.8803017Z 062e450697fa: Download complete
+2026-07-29T23:12:56.9242826Z 0991be5ba967: Verifying Checksum
+2026-07-29T23:12:56.9243786Z 0991be5ba967: Download complete
+2026-07-29T23:12:56.9275894Z 2f0a4cdcb4a0: Verifying Checksum
+2026-07-29T23:12:56.9276803Z 2f0a4cdcb4a0: Download complete
+2026-07-29T23:12:56.9293979Z 7b78d2f26598: Verifying Checksum
+2026-07-29T23:12:56.9294871Z 7b78d2f26598: Download complete
+2026-07-29T23:12:56.9780462Z 7f9e3a85794c: Verifying Checksum
+2026-07-29T23:12:56.9781912Z 7f9e3a85794c: Download complete
+2026-07-29T23:12:56.9813243Z 98d8c18b5328: Verifying Checksum
+2026-07-29T23:12:56.9814632Z 98d8c18b5328: Download complete
+2026-07-29T23:12:57.0296658Z 115bb5c8bb8b: Verifying Checksum
+2026-07-29T23:12:57.0300563Z 115bb5c8bb8b: Download complete
+2026-07-29T23:12:57.0311732Z ed3f4fc92f94: Verifying Checksum
+2026-07-29T23:12:57.0313275Z ed3f4fc92f94: Download complete
+2026-07-29T23:12:57.0805655Z 55e69f401030: Download complete
+2026-07-29T23:12:57.0862752Z 971d8ffba74c: Verifying Checksum
+2026-07-29T23:12:57.0864074Z 971d8ffba74c: Download complete
+2026-07-29T23:12:57.3839789Z cb52fa00305a: Verifying Checksum
+2026-07-29T23:12:57.3840564Z cb52fa00305a: Download complete
+2026-07-29T23:12:57.9192799Z 062e450697fa: Pull complete
+2026-07-29T23:12:58.2352553Z c68b4bd1f4db: Pull complete
+2026-07-29T23:12:58.4076934Z d05a3039bf71: Pull complete
+2026-07-29T23:12:58.4473381Z 16a6273f39e4: Pull complete
+2026-07-29T23:12:58.7418828Z 2f0a4cdcb4a0: Pull complete
+2026-07-29T23:12:58.8146401Z 0991be5ba967: Pull complete
+2026-07-29T23:12:58.8237487Z 7b78d2f26598: Pull complete
+2026-07-29T23:12:58.8322541Z 7f9e3a85794c: Pull complete
+2026-07-29T23:13:01.8890305Z cb52fa00305a: Pull complete
+2026-07-29T23:13:01.9033083Z 98d8c18b5328: Pull complete
+2026-07-29T23:13:01.9126324Z 115bb5c8bb8b: Pull complete
+2026-07-29T23:13:01.9216510Z ed3f4fc92f94: Pull complete
+2026-07-29T23:13:01.9314831Z 55e69f401030: Pull complete
+2026-07-29T23:13:01.9399129Z 971d8ffba74c: Pull complete
+2026-07-29T23:13:01.9433901Z Digest: sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+2026-07-29T23:13:01.9446445Z Status: Downloaded newer image for postgres:16
+2026-07-29T23:13:01.9460415Z docker.io/library/postgres:16
+2026-07-29T23:13:01.9520445Z ##[command]/usr/bin/docker create --name 3cbac5b0af594a558431c29e99890143_postgres16_5be020 --label 48a3d2 --network github_network_445673adf1644b63904e6265788e913b --network-alias postgres -p 5432:5432 --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5 -e "POSTGRES_PASSWORD=postgres" -e "POSTGRES_DB=ci_triage_test" -e GITHUB_ACTIONS=true -e CI=true postgres:16
+2026-07-29T23:13:01.9769222Z 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:01.9791582Z ##[command]/usr/bin/docker start 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:02.1996220Z 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:02.2014600Z ##[command]/usr/bin/docker ps --all --filter id=745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-07-29T23:13:02.2163206Z 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a Up Less than a second (health: starting)
+2026-07-29T23:13:02.2175442Z ##[command]/usr/bin/docker port 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:02.2309952Z 5432/tcp -> 0.0.0.0:5432
+2026-07-29T23:13:02.2310650Z 5432/tcp -> [::]:5432
+2026-07-29T23:13:02.2358019Z ##[endgroup]
+2026-07-29T23:13:02.2366623Z ##[group]Waiting for all services to be ready
+2026-07-29T23:13:02.2380090Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:02.2536413Z starting
+2026-07-29T23:13:02.2559380Z postgres service is starting, waiting 2 seconds before checking again.
+2026-07-29T23:13:04.2558576Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:04.2685498Z starting
+2026-07-29T23:13:04.2697575Z postgres service is starting, waiting 3 seconds before checking again.
+2026-07-29T23:13:08.2605827Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:08.2735832Z starting
+2026-07-29T23:13:08.2749273Z postgres service is starting, waiting 7 seconds before checking again.
+2026-07-29T23:13:15.4911049Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:15.5039894Z healthy
+2026-07-29T23:13:15.5055285Z postgres service is healthy.
+2026-07-29T23:13:15.5056302Z ##[endgroup]
+2026-07-29T23:13:15.5328164Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-29T23:13:15.5336075Z ##[group]Run actions/checkout@v4
+2026-07-29T23:13:15.5336488Z with:
+2026-07-29T23:13:15.5336716Z   repository: muhzuhaib/ci-triage
+2026-07-29T23:13:15.5339364Z   token: ***
+2026-07-29T23:13:15.5339585Z   ssh-strict: true
+2026-07-29T23:13:15.5339800Z   ssh-user: git
+2026-07-29T23:13:15.5340016Z   persist-credentials: true
+2026-07-29T23:13:15.5340271Z   clean: true
+2026-07-29T23:13:15.5340529Z   sparse-checkout-cone-mode: true
+2026-07-29T23:13:15.5340789Z   fetch-depth: 1
+2026-07-29T23:13:15.5341002Z   fetch-tags: false
+2026-07-29T23:13:15.5341216Z   show-progress: true
+2026-07-29T23:13:15.5341429Z   lfs: false
+2026-07-29T23:13:15.5341676Z   submodules: false
+2026-07-29T23:13:15.5341890Z   set-safe-directory: true
+2026-07-29T23:13:15.5342145Z   allow-unsafe-pr-checkout: false
+2026-07-29T23:13:15.5342847Z ##[endgroup]
+2026-07-29T23:13:15.6438893Z Syncing repository: muhzuhaib/ci-triage
+2026-07-29T23:13:15.6440333Z ##[group]Getting Git version info
+2026-07-29T23:13:15.6440723Z Working directory is '/home/runner/work/ci-triage/ci-triage'
+2026-07-29T23:13:15.6441385Z [command]/usr/bin/git version
+2026-07-29T23:13:15.6455703Z git version 2.54.0
+2026-07-29T23:13:15.6475771Z ##[endgroup]
+2026-07-29T23:13:15.6492684Z Temporarily overriding HOME='/home/runner/work/_temp/20c38c67-0868-46ce-bd0f-547d84f9606c' before making global git config changes
+2026-07-29T23:13:15.6493951Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-29T23:13:15.6500198Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/ci-triage/ci-triage
+2026-07-29T23:13:15.6549648Z Deleting the contents of '/home/runner/work/ci-triage/ci-triage'
+2026-07-29T23:13:15.6557895Z ##[group]Initializing the repository
+2026-07-29T23:13:15.6558994Z [command]/usr/bin/git init /home/runner/work/ci-triage/ci-triage
+2026-07-29T23:13:15.6635036Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-29T23:13:15.6636026Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-29T23:13:15.6640386Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-29T23:13:15.6641204Z hint: call:
+2026-07-29T23:13:15.6641511Z hint:
+2026-07-29T23:13:15.6642101Z hint: 	git config --global init.defaultBranch <name>
+2026-07-29T23:13:15.6642856Z hint:
+2026-07-29T23:13:15.6643333Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-29T23:13:15.6644141Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-29T23:13:15.6644760Z hint:
+2026-07-29T23:13:15.6645069Z hint: 	git branch -m <name>
+2026-07-29T23:13:15.6645476Z hint:
+2026-07-29T23:13:15.6645975Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-29T23:13:15.6646834Z Initialized empty Git repository in /home/runner/work/ci-triage/ci-triage/.git/
+2026-07-29T23:13:15.6649694Z [command]/usr/bin/git remote add origin https://github.com/muhzuhaib/ci-triage
+2026-07-29T23:13:15.6724025Z ##[endgroup]
+2026-07-29T23:13:15.6724627Z ##[group]Disabling automatic garbage collection
+2026-07-29T23:13:15.6727583Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-29T23:13:15.6758440Z ##[endgroup]
+2026-07-29T23:13:15.6759028Z ##[group]Setting up auth
+2026-07-29T23:13:15.6765765Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-29T23:13:15.6803440Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-29T23:13:15.7145918Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-29T23:13:15.7178757Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-29T23:13:15.7441599Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-29T23:13:15.7481122Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-29T23:13:15.7721639Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-29T23:13:15.7763080Z ##[endgroup]
+2026-07-29T23:13:15.7763491Z ##[group]Fetching the repository
+2026-07-29T23:13:15.7773039Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +0eeeaad00fe8113fd5b7b0d0e56f50e227c8ac4b:refs/remotes/origin/main
+2026-07-29T23:13:15.9831295Z From https://github.com/muhzuhaib/ci-triage
+2026-07-29T23:13:15.9832518Z  * [new ref]         0eeeaad00fe8113fd5b7b0d0e56f50e227c8ac4b -> origin/main
+2026-07-29T23:13:15.9887154Z ##[endgroup]
+2026-07-29T23:13:15.9893227Z ##[group]Determining the checkout info
+2026-07-29T23:13:15.9894059Z ##[endgroup]
+2026-07-29T23:13:15.9894458Z [command]/usr/bin/git sparse-checkout disable
+2026-07-29T23:13:15.9943307Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-29T23:13:15.9981744Z ##[group]Checking out the ref
+2026-07-29T23:13:15.9988737Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-07-29T23:13:16.0086998Z Switched to a new branch 'main'
+2026-07-29T23:13:16.0089678Z branch 'main' set up to track 'origin/main'.
+2026-07-29T23:13:16.0096249Z ##[endgroup]
+2026-07-29T23:13:16.0146290Z [command]/usr/bin/git log -1 --format=%H
+2026-07-29T23:13:16.0177308Z 0eeeaad00fe8113fd5b7b0d0e56f50e227c8ac4b
+2026-07-29T23:13:16.0432486Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-29T23:13:16.0434225Z ##[group]Run actions/setup-python@v5
+2026-07-29T23:13:16.0434487Z with:
+2026-07-29T23:13:16.0434688Z   python-version: 3.13
+2026-07-29T23:13:16.0434917Z   check-latest: false
+2026-07-29T23:13:16.0437430Z   token: ***
+2026-07-29T23:13:16.0437643Z   update-environment: true
+2026-07-29T23:13:16.0437892Z   allow-prereleases: false
+2026-07-29T23:13:16.0438113Z   freethreaded: false
+2026-07-29T23:13:16.0438335Z ##[endgroup]
+2026-07-29T23:13:16.1767759Z ##[group]Installed versions
+2026-07-29T23:13:16.1851274Z (node:2697) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-29T23:13:16.1852467Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-29T23:13:16.1853175Z Successfully set up CPython (3.13.14)
+2026-07-29T23:13:16.1853677Z ##[endgroup]
+2026-07-29T23:13:16.2027470Z ##[group]Run python -m pip install -e ".[dev,postgres]"
+2026-07-29T23:13:16.2028175Z [36;1mpython -m pip install -e ".[dev,postgres]"[0m
+2026-07-29T23:13:16.2106177Z shell: /usr/bin/bash -e {0}
+2026-07-29T23:13:16.2106565Z env:
+2026-07-29T23:13:16.2106969Z   pythonLocation: /opt/hostedtoolcache/Python/3.13.14/x64
+2026-07-29T23:13:16.2107679Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.13.14/x64/lib/pkgconfig
+2026-07-29T23:13:16.2108364Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.14/x64
+2026-07-29T23:13:16.2108964Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.14/x64
+2026-07-29T23:13:16.2109572Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.14/x64
+2026-07-29T23:13:16.2110176Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.13.14/x64/lib
+2026-07-29T23:13:16.2110694Z ##[endgroup]
+2026-07-29T23:13:18.3597820Z Obtaining file:///home/runner/work/ci-triage/ci-triage
+2026-07-29T23:13:18.3614511Z   Installing build dependencies: started
+2026-07-29T23:13:19.1344032Z   Installing build dependencies: finished with status 'done'
+2026-07-29T23:13:19.1350608Z   Checking if build backend supports build_editable: started
+2026-07-29T23:13:19.1796477Z   Checking if build backend supports build_editable: finished with status 'done'
+2026-07-29T23:13:19.1804057Z   Getting requirements to build editable: started
+2026-07-29T23:13:19.3398103Z   Getting requirements to build editable: finished with status 'done'
+2026-07-29T23:13:19.3410601Z   Installing backend dependencies: started
+2026-07-29T23:13:19.8655208Z   Installing backend dependencies: finished with status 'done'
+2026-07-29T23:13:19.8661509Z   Preparing editable metadata (pyproject.toml): started
+2026-07-29T23:13:20.0750376Z   Preparing editable metadata (pyproject.toml): finished with status 'done'
+2026-07-29T23:13:20.3948516Z Collecting sqlalchemy>=2.0 (from ci-triage==0.2.0)
+2026-07-29T23:13:20.4558549Z   Downloading sqlalchemy-2.0.51-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (9.5 kB)
+2026-07-29T23:13:20.4818021Z Collecting httpx>=0.27 (from ci-triage==0.2.0)
+2026-07-29T23:13:20.4899832Z   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+2026-07-29T23:13:20.5262651Z Collecting pytest>=8.0 (from ci-triage==0.2.0)
+2026-07-29T23:13:20.5345773Z   Downloading pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+2026-07-29T23:13:20.5544292Z Collecting psycopg>=3.1 (from psycopg[binary]>=3.1; extra == "postgres"->ci-triage==0.2.0)
+2026-07-29T23:13:20.5632662Z   Downloading psycopg-3.3.4-py3-none-any.whl.metadata (4.3 kB)
+2026-07-29T23:13:20.5856164Z Collecting anyio (from httpx>=0.27->ci-triage==0.2.0)
+2026-07-29T23:13:20.5932988Z   Downloading anyio-4.14.2-py3-none-any.whl.metadata (4.6 kB)
+2026-07-29T23:13:20.6138539Z Collecting certifi (from httpx>=0.27->ci-triage==0.2.0)
+2026-07-29T23:13:20.6217093Z   Downloading certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+2026-07-29T23:13:20.6387673Z Collecting httpcore==1.* (from httpx>=0.27->ci-triage==0.2.0)
+2026-07-29T23:13:20.6468528Z   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+2026-07-29T23:13:20.6670296Z Collecting idna (from httpx>=0.27->ci-triage==0.2.0)
+2026-07-29T23:13:20.6753187Z   Downloading idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+2026-07-29T23:13:20.6897965Z Collecting h11>=0.16 (from httpcore==1.*->httpx>=0.27->ci-triage==0.2.0)
+2026-07-29T23:13:20.6988276Z   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-07-29T23:13:20.8357999Z Collecting psycopg-binary==3.3.4 (from psycopg[binary]>=3.1; extra == "postgres"->ci-triage==0.2.0)
+2026-07-29T23:13:20.8447335Z   Downloading psycopg_binary-3.3.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.7 kB)
+2026-07-29T23:13:20.8592080Z Collecting iniconfig>=1.0.1 (from pytest>=8.0->ci-triage==0.2.0)
+2026-07-29T23:13:20.8669285Z   Downloading iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)
+2026-07-29T23:13:20.8828612Z Collecting packaging>=22 (from pytest>=8.0->ci-triage==0.2.0)
+2026-07-29T23:13:20.8840003Z   Using cached packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+2026-07-29T23:13:20.8968965Z Collecting pluggy<2,>=1.5 (from pytest>=8.0->ci-triage==0.2.0)
+2026-07-29T23:13:20.8980132Z   Using cached pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+2026-07-29T23:13:20.9163251Z Collecting pygments>=2.7.2 (from pytest>=8.0->ci-triage==0.2.0)
+2026-07-29T23:13:20.9240299Z   Downloading pygments-2.20.0-py3-none-any.whl.metadata (2.5 kB)
+2026-07-29T23:13:21.0517801Z Collecting greenlet>=1 (from sqlalchemy>=2.0->ci-triage==0.2.0)
+2026-07-29T23:13:21.0615304Z   Downloading greenlet-3.5.4-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+2026-07-29T23:13:21.0800486Z Collecting typing-extensions>=4.6.0 (from sqlalchemy>=2.0->ci-triage==0.2.0)
+2026-07-29T23:13:21.0879758Z   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-07-29T23:13:21.1024333Z Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+2026-07-29T23:13:21.1184156Z Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+2026-07-29T23:13:21.1283702Z Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-07-29T23:13:21.1379165Z Downloading psycopg-3.3.4-py3-none-any.whl (213 kB)
+2026-07-29T23:13:21.1547213Z Downloading psycopg_binary-3.3.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.2 MB)
+2026-07-29T23:13:21.2021673Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.2/5.2 MB 125.6 MB/s  0:00:00
+2026-07-29T23:13:21.2101546Z Downloading pytest-9.1.1-py3-none-any.whl (386 kB)
+2026-07-29T23:13:21.2138916Z Using cached pluggy-1.6.0-py3-none-any.whl (20 kB)
+2026-07-29T23:13:21.2220757Z Downloading iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+2026-07-29T23:13:21.2248168Z Using cached packaging-26.2-py3-none-any.whl (100 kB)
+2026-07-29T23:13:21.2328837Z Downloading pygments-2.20.0-py3-none-any.whl (1.2 MB)
+2026-07-29T23:13:21.2390107Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 256.7 MB/s  0:00:00
+2026-07-29T23:13:21.2472139Z Downloading sqlalchemy-2.0.51-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.3 MB)
+2026-07-29T23:13:21.2973519Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 71.5 MB/s  0:00:00
+2026-07-29T23:13:21.3055810Z Downloading greenlet-3.5.4-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (624 kB)
+2026-07-29T23:13:21.3106903Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 624.0/624.0 kB 140.2 MB/s  0:00:00
+2026-07-29T23:13:21.3189753Z Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-07-29T23:13:21.3298915Z Downloading anyio-4.14.2-py3-none-any.whl (125 kB)
+2026-07-29T23:13:21.3401103Z Downloading idna-3.18-py3-none-any.whl (65 kB)
+2026-07-29T23:13:21.3495967Z Downloading certifi-2026.7.22-py3-none-any.whl (136 kB)
+2026-07-29T23:13:21.3782807Z Building wheels for collected packages: ci-triage
+2026-07-29T23:13:21.3790578Z   Building editable for ci-triage (pyproject.toml): started
+2026-07-29T23:13:21.4184648Z   Building editable for ci-triage (pyproject.toml): finished with status 'done'
+2026-07-29T23:13:21.4189590Z   Created wheel for ci-triage: filename=ci_triage-0.2.0-py3-none-any.whl size=13127 sha256=8dffbb6654eb7380719390610c4954731d76e2d4c7b89e32ac70711af3ccb066
+2026-07-29T23:13:21.4191197Z   Stored in directory: /tmp/pip-ephem-wheel-cache-d2bve1ta/wheels/50/bc/52/093fc3dae0a1ca9bbb36854bc9a032a4e422bb059dda629fcd
+2026-07-29T23:13:21.4217454Z Successfully built ci-triage
+2026-07-29T23:13:21.4504577Z Installing collected packages: typing-extensions, pygments, psycopg-binary, psycopg, pluggy, packaging, iniconfig, idna, h11, greenlet, certifi, sqlalchemy, pytest, httpcore, anyio, httpx, ci-triage
+2026-07-29T23:13:24.4336169Z 
+2026-07-29T23:13:24.4359523Z Successfully installed anyio-4.14.2 certifi-2026.7.22 ci-triage-0.2.0 greenlet-3.5.4 h11-0.16.0 httpcore-1.0.9 httpx-0.28.1 idna-3.18 iniconfig-2.3.0 packaging-26.2 pluggy-1.6.0 psycopg-3.3.4 psycopg-binary-3.3.4 pygments-2.20.0 pytest-9.1.1 sqlalchemy-2.0.51 typing-extensions-4.16.0
+2026-07-29T23:13:24.4368786Z 
+2026-07-29T23:13:24.4369490Z [notice] A new release of pip is available: 26.1.2 -> 26.2
+2026-07-29T23:13:24.4369913Z [notice] To update, run: pip install --upgrade pip
+2026-07-29T23:13:24.5213302Z ##[group]Run python -m pytest -q
+2026-07-29T23:13:24.5213656Z [36;1mpython -m pytest -q[0m
+2026-07-29T23:13:24.5263404Z shell: /usr/bin/bash -e {0}
+2026-07-29T23:13:24.5263666Z env:
+2026-07-29T23:13:24.5263949Z   pythonLocation: /opt/hostedtoolcache/Python/3.13.14/x64
+2026-07-29T23:13:24.5264407Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.13.14/x64/lib/pkgconfig
+2026-07-29T23:13:24.5264831Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.14/x64
+2026-07-29T23:13:24.5265208Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.14/x64
+2026-07-29T23:13:24.5265584Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.14/x64
+2026-07-29T23:13:24.5265954Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.13.14/x64/lib
+2026-07-29T23:13:24.5266677Z   CI_TRIAGE_TEST_DATABASE_URL: ***localhost:5432/ci_triage_test
+2026-07-29T23:13:24.5267035Z ##[endgroup]
+2026-07-29T23:13:27.2420171Z ........................................................................ [ 40%]
+2026-07-29T23:13:28.4519391Z ........................................................................ [ 80%]
+2026-07-29T23:13:28.7626707Z ..................................                                       [100%]
+2026-07-29T23:13:28.7627125Z 178 passed in 3.17s
+2026-07-29T23:13:28.8623831Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-29T23:13:28.8625007Z Post job cleanup.
+2026-07-29T23:13:28.9802928Z (node:3226) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-29T23:13:28.9804012Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-29T23:13:28.9996542Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-29T23:13:28.9997698Z Post job cleanup.
+2026-07-29T23:13:29.0870627Z [command]/usr/bin/git version
+2026-07-29T23:13:29.0947582Z git version 2.54.0
+2026-07-29T23:13:29.0987122Z Temporarily overriding HOME='/home/runner/work/_temp/35493d91-45ec-490f-8f30-8bc8e63906e2' before making global git config changes
+2026-07-29T23:13:29.0988348Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-29T23:13:29.0993199Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/ci-triage/ci-triage
+2026-07-29T23:13:29.1033562Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-29T23:13:29.1070502Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-29T23:13:29.1345684Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-29T23:13:29.1385795Z http.https://github.com/.extraheader
+2026-07-29T23:13:29.1397109Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-07-29T23:13:29.1440971Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-29T23:13:29.1752150Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-29T23:13:29.1801081Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-29T23:13:29.2260109Z Print service container logs: 3cbac5b0af594a558431c29e99890143_postgres16_5be020
+2026-07-29T23:13:29.2266787Z ##[command]/usr/bin/docker logs --details 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:29.2404010Z  initdb: warning: enabling "trust" authentication for local connections
+2026-07-29T23:13:29.2404658Z  The files belonging to this database system will be owned by user "postgres".
+2026-07-29T23:13:29.2405487Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-07-29T23:13:29.2406488Z  2026-07-29 23:13:03.134 UTC [1] LOG:  starting PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-07-29T23:13:29.2407218Z  2026-07-29 23:13:03.134 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-07-29T23:13:29.2407773Z  2026-07-29 23:13:03.134 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-07-29T23:13:29.2408300Z  2026-07-29 23:13:03.135 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-07-29T23:13:29.2408869Z  2026-07-29 23:13:03.138 UTC [66] LOG:  database system was shut down at 2026-07-29 23:13:03 UTC
+2026-07-29T23:13:29.2409380Z  2026-07-29 23:13:03.141 UTC [1] LOG:  database system is ready to accept connections
+2026-07-29T23:13:29.2409832Z  2026-07-29 23:13:12.263 UTC [77] FATAL:  role "root" does not exist
+2026-07-29T23:13:29.2410223Z  2026-07-29 23:13:22.329 UTC [85] FATAL:  role "root" does not exist
+2026-07-29T23:13:29.2410724Z  2026-07-29 23:13:25.927 UTC [86] ERROR:  duplicate key value violates unique constraint "run_budgets_pkey"
+2026-07-29T23:13:29.2411252Z  2026-07-29 23:13:25.927 UTC [86] DETAIL:  Key (run_id)=(r1) already exists.
+2026-07-29T23:13:29.2412409Z  2026-07-29 23:13:25.927 UTC [86] STATEMENT:  INSERT INTO run_budgets (run_id, ceiling_micros, spent_micros, reserved_micros, overrun_micros, created_at) VALUES ($1::VARCHAR, $2::BIGINT, $3::BIGINT, $4::BIGINT, $5::BIGINT, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2413490Z  2026-07-29 23:13:25.953 UTC [87] ERROR:  duplicate key value violates unique constraint "run_budgets_pkey"
+2026-07-29T23:13:29.2414001Z  2026-07-29 23:13:25.953 UTC [87] DETAIL:  Key (run_id)=(r1) already exists.
+2026-07-29T23:13:29.2414913Z  2026-07-29 23:13:25.953 UTC [87] STATEMENT:  INSERT INTO run_budgets (run_id, ceiling_micros, spent_micros, reserved_micros, overrun_micros, created_at) VALUES ($1::VARCHAR, $2::BIGINT, $3::BIGINT, $4::BIGINT, $5::BIGINT, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2415968Z  2026-07-29 23:13:26.870 UTC [172] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2416507Z  2026-07-29 23:13:26.870 UTC [172] DETAIL:  Key (key)=(k1) already exists.
+2026-07-29T23:13:29.2417433Z  2026-07-29 23:13:26.870 UTC [172] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2418817Z  2026-07-29 23:13:26.891 UTC [173] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2419360Z  2026-07-29 23:13:26.891 UTC [173] DETAIL:  Key (key)=(k1) already exists.
+2026-07-29T23:13:29.2420277Z  2026-07-29 23:13:26.891 UTC [173] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2421287Z  2026-07-29 23:13:26.933 UTC [175] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2421795Z  2026-07-29 23:13:26.933 UTC [175] DETAIL:  Key (key)=(k1) already exists.
+2026-07-29T23:13:29.2424688Z  2026-07-29 23:13:26.933 UTC [175] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2426990Z  2026-07-29 23:13:26.994 UTC [178] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2427891Z  2026-07-29 23:13:26.994 UTC [178] DETAIL:  Key (key)=(k1) already exists.
+2026-07-29T23:13:29.2429502Z  2026-07-29 23:13:26.994 UTC [178] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2431219Z  2026-07-29 23:13:27.063 UTC [180] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2431974Z  2026-07-29 23:13:27.063 UTC [180] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2433744Z  2026-07-29 23:13:27.063 UTC [180] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2435461Z  2026-07-29 23:13:27.067 UTC [184] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2436355Z  2026-07-29 23:13:27.067 UTC [184] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2437841Z  2026-07-29 23:13:27.067 UTC [184] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2439500Z  2026-07-29 23:13:27.071 UTC [191] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2440342Z  2026-07-29 23:13:27.071 UTC [191] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2441905Z  2026-07-29 23:13:27.071 UTC [191] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2443907Z  2026-07-29 23:13:27.079 UTC [186] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2444812Z  2026-07-29 23:13:27.079 UTC [186] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2446177Z  2026-07-29 23:13:27.079 UTC [186] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2447417Z  2026-07-29 23:13:27.080 UTC [183] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2447969Z  2026-07-29 23:13:27.080 UTC [183] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2449300Z  2026-07-29 23:13:27.080 UTC [183] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2450427Z  2026-07-29 23:13:27.080 UTC [190] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2450967Z  2026-07-29 23:13:27.080 UTC [190] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2451860Z  2026-07-29 23:13:27.080 UTC [190] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2453172Z  2026-07-29 23:13:27.081 UTC [193] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2453879Z  2026-07-29 23:13:27.081 UTC [193] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2454787Z  2026-07-29 23:13:27.081 UTC [193] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2455797Z  2026-07-29 23:13:27.082 UTC [192] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2456337Z  2026-07-29 23:13:27.082 UTC [192] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2457231Z  2026-07-29 23:13:27.082 UTC [192] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2458230Z  2026-07-29 23:13:27.084 UTC [185] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2458764Z  2026-07-29 23:13:27.084 UTC [185] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2459666Z  2026-07-29 23:13:27.084 UTC [185] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2460684Z  2026-07-29 23:13:27.085 UTC [194] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2461216Z  2026-07-29 23:13:27.085 UTC [194] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2462114Z  2026-07-29 23:13:27.085 UTC [194] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2463347Z  2026-07-29 23:13:27.088 UTC [181] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2463885Z  2026-07-29 23:13:27.088 UTC [181] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2464783Z  2026-07-29 23:13:27.088 UTC [181] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2465784Z  2026-07-29 23:13:27.088 UTC [182] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2466315Z  2026-07-29 23:13:27.088 UTC [182] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2467216Z  2026-07-29 23:13:27.088 UTC [182] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2468323Z  2026-07-29 23:13:27.092 UTC [188] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2469008Z  2026-07-29 23:13:27.092 UTC [188] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2469909Z  2026-07-29 23:13:27.092 UTC [188] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2470918Z  2026-07-29 23:13:27.093 UTC [189] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2471450Z  2026-07-29 23:13:27.093 UTC [189] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2472873Z  2026-07-29 23:13:27.093 UTC [189] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2474020Z  2026-07-29 23:13:27.094 UTC [187] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2474558Z  2026-07-29 23:13:27.094 UTC [187] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2475457Z  2026-07-29 23:13:27.094 UTC [187] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2476458Z  2026-07-29 23:13:27.199 UTC [206] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2476979Z  2026-07-29 23:13:27.199 UTC [206] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2477869Z  2026-07-29 23:13:27.199 UTC [206] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2478887Z  2026-07-29 23:13:27.199 UTC [205] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2479409Z  2026-07-29 23:13:27.199 UTC [205] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2480298Z  2026-07-29 23:13:27.199 UTC [205] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2481295Z  2026-07-29 23:13:27.199 UTC [202] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2481818Z  2026-07-29 23:13:27.199 UTC [202] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2483086Z  2026-07-29 23:13:27.199 UTC [202] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2484099Z  2026-07-29 23:13:27.200 UTC [199] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2484628Z  2026-07-29 23:13:27.200 UTC [199] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2485548Z  2026-07-29 23:13:27.200 UTC [199] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2486564Z  2026-07-29 23:13:27.208 UTC [195] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2487108Z  2026-07-29 23:13:27.208 UTC [195] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2488013Z  2026-07-29 23:13:27.208 UTC [195] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2489175Z  2026-07-29 23:13:27.219 UTC [213] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2489716Z  2026-07-29 23:13:27.219 UTC [213] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2490612Z  2026-07-29 23:13:27.219 UTC [213] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2491610Z  2026-07-29 23:13:27.225 UTC [215] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2492136Z  2026-07-29 23:13:27.225 UTC [215] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2493351Z  2026-07-29 23:13:27.225 UTC [215] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2494408Z  2026-07-29 23:13:27.226 UTC [212] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2494943Z  2026-07-29 23:13:27.226 UTC [212] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2495843Z  2026-07-29 23:13:27.226 UTC [212] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2496856Z  2026-07-29 23:13:27.226 UTC [219] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2497379Z  2026-07-29 23:13:27.226 UTC [219] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2498275Z  2026-07-29 23:13:27.226 UTC [219] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2499274Z  2026-07-29 23:13:27.227 UTC [214] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2499796Z  2026-07-29 23:13:27.227 UTC [214] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2500687Z  2026-07-29 23:13:27.227 UTC [214] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2501697Z  2026-07-29 23:13:27.227 UTC [210] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2502397Z  2026-07-29 23:13:27.227 UTC [210] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2503342Z  2026-07-29 23:13:27.227 UTC [210] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2504381Z  2026-07-29 23:13:27.228 UTC [218] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2504944Z  2026-07-29 23:13:27.228 UTC [218] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2505865Z  2026-07-29 23:13:27.228 UTC [218] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2506882Z  2026-07-29 23:13:27.228 UTC [217] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2507451Z  2026-07-29 23:13:27.228 UTC [217] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2508531Z  2026-07-29 23:13:27.228 UTC [217] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2509537Z  2026-07-29 23:13:27.232 UTC [211] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2510066Z  2026-07-29 23:13:27.232 UTC [211] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2510957Z  2026-07-29 23:13:27.232 UTC [211] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2511958Z  2026-07-29 23:13:27.235 UTC [216] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2512675Z  2026-07-29 23:13:27.235 UTC [216] DETAIL:  Key (key)=(hot-key) already exists.
+2026-07-29T23:13:29.2513732Z  2026-07-29 23:13:27.235 UTC [216] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2514825Z  2026-07-29 23:13:27.349 UTC [221] ERROR:  duplicate key value violates unique constraint "triage_jobs_idempotency_key_key"
+2026-07-29T23:13:29.2515566Z  2026-07-29 23:13:27.349 UTC [221] DETAIL:  Key (idempotency_key)=(workflow_run:acme/app:1:1:completed) already exists.
+2026-07-29T23:13:29.2517341Z  2026-07-29 23:13:27.349 UTC [221] STATEMENT:  INSERT INTO triage_jobs (id, idempotency_key, run_id, state, attempt, max_attempts, next_attempt_at, lease_expires_at, worker, last_error, result, replays, created_at, updated_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::INTEGER, $6::INTEGER, $7::TIMESTAMP WITH TIME ZONE, $8::TIMESTAMP WITH TIME ZONE, $9::VARCHAR, $10::VARCHAR, $11::VARCHAR, $12::INTEGER, $13::TIMESTAMP WITH TIME ZONE, $14::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2519086Z  2026-07-29 23:13:27.811 UTC [237] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2519729Z  2026-07-29 23:13:27.811 UTC [237] DETAIL:  Key (key)=(workflow_run:acme/app:1:1:completed) already exists.
+2026-07-29T23:13:29.2520743Z  2026-07-29 23:13:27.811 UTC [237] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2521775Z  2026-07-29 23:13:27.870 UTC [239] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2522575Z  2026-07-29 23:13:27.870 UTC [239] DETAIL:  Key (key)=(workflow_run:acme/app:1:1:completed) already exists.
+2026-07-29T23:13:29.2523589Z  2026-07-29 23:13:27.870 UTC [239] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2524629Z  2026-07-29 23:13:27.915 UTC [241] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2525253Z  2026-07-29 23:13:27.915 UTC [241] DETAIL:  Key (key)=(workflow_run:acme/app:1:1:completed) already exists.
+2026-07-29T23:13:29.2526239Z  2026-07-29 23:13:27.915 UTC [241] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2527258Z  2026-07-29 23:13:28.569 UTC [317] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2527874Z  2026-07-29 23:13:28.569 UTC [317] DETAIL:  Key (key)=(workflow_run:octo/repo:42:1:completed) already exists.
+2026-07-29T23:13:29.2529043Z  2026-07-29 23:13:28.569 UTC [317] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2530071Z  2026-07-29 23:13:28.591 UTC [318] ERROR:  duplicate key value violates unique constraint "idempotency_keys_pkey"
+2026-07-29T23:13:29.2530697Z  2026-07-29 23:13:28.591 UTC [318] DETAIL:  Key (key)=(workflow_run:octo/repo:42:1:completed) already exists.
+2026-07-29T23:13:29.2531693Z  2026-07-29 23:13:28.591 UTC [318] STATEMENT:  INSERT INTO idempotency_keys (key, run_id, state, result, created_at, completed_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::TIMESTAMP WITH TIME ZONE, $6::TIMESTAMP WITH TIME ZONE)
+2026-07-29T23:13:29.2532755Z  This user must also own the server process.
+2026-07-29T23:13:29.2533040Z  
+2026-07-29T23:13:29.2533324Z  The database cluster will be initialized with locale "en_US.utf8".
+2026-07-29T23:13:29.2533913Z  The default database encoding has accordingly been set to "UTF8".
+2026-07-29T23:13:29.2534341Z  The default text search configuration will be set to "english".
+2026-07-29T23:13:29.2534672Z  
+2026-07-29T23:13:29.2534867Z  Data page checksums are disabled.
+2026-07-29T23:13:29.2535108Z  
+2026-07-29T23:13:29.2535401Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+2026-07-29T23:13:29.2535810Z  creating subdirectories ... ok
+2026-07-29T23:13:29.2536128Z  selecting dynamic shared memory implementation ... posix
+2026-07-29T23:13:29.2536474Z  selecting default max_connections ... 100
+2026-07-29T23:13:29.2536766Z  selecting default shared_buffers ... 128MB
+2026-07-29T23:13:29.2537065Z  selecting default time zone ... Etc/UTC
+2026-07-29T23:13:29.2537350Z  creating configuration files ... ok
+2026-07-29T23:13:29.2537625Z  running bootstrap script ... ok
+2026-07-29T23:13:29.2537920Z  performing post-bootstrap initialization ... ok
+2026-07-29T23:13:29.2538232Z  syncing data to disk ... ok
+2026-07-29T23:13:29.2538461Z  
+2026-07-29T23:13:29.2538631Z  
+2026-07-29T23:13:29.2538858Z  Success. You can now start the database server using:
+2026-07-29T23:13:29.2539153Z  
+2026-07-29T23:13:29.2539399Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+2026-07-29T23:13:29.2539696Z  
+2026-07-29T23:13:29.2540345Z  waiting for server to start....2026-07-29 23:13:02.828 UTC [50] LOG:  starting PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-07-29T23:13:29.2541202Z  2026-07-29 23:13:02.829 UTC [50] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-07-29T23:13:29.2541763Z  2026-07-29 23:13:02.831 UTC [53] LOG:  database system was shut down at 2026-07-29 23:13:02 UTC
+2026-07-29T23:13:29.2542490Z  2026-07-29 23:13:02.835 UTC [50] LOG:  database system is ready to accept connections
+2026-07-29T23:13:29.2542869Z   done
+2026-07-29T23:13:29.2543064Z  server started
+2026-07-29T23:13:29.2543261Z  CREATE DATABASE
+2026-07-29T23:13:29.2543458Z  
+2026-07-29T23:13:29.2543629Z  
+2026-07-29T23:13:29.2543943Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+2026-07-29T23:13:29.2544332Z  
+2026-07-29T23:13:29.2544690Z  waiting for server to shut down...2026-07-29 23:13:03.013 UTC [50] LOG:  received fast shutdown request
+2026-07-29T23:13:29.2545212Z  .2026-07-29 23:13:03.013 UTC [50] LOG:  aborting any active transactions
+2026-07-29T23:13:29.2545805Z  2026-07-29 23:13:03.016 UTC [50] LOG:  background worker "logical replication launcher" (PID 56) exited with exit code 1
+2026-07-29T23:13:29.2546334Z  2026-07-29 23:13:03.016 UTC [51] LOG:  shutting down
+2026-07-29T23:13:29.2546724Z  2026-07-29 23:13:03.017 UTC [51] LOG:  checkpoint starting: shutdown immediate
+2026-07-29T23:13:29.2547830Z  2026-07-29 23:13:03.031 UTC [51] LOG:  checkpoint complete: wrote 926 buffers (5.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.013 s, sync=0.002 s, total=0.016 s; sync files=301, longest=0.001 s, average=0.001 s; distance=4273 kB, estimate=4273 kB; lsn=0/191F0F0, redo lsn=0/191F0F0
+2026-07-29T23:13:29.2549047Z  2026-07-29 23:13:03.038 UTC [50] LOG:  database system is shut down
+2026-07-29T23:13:29.2549375Z   done
+2026-07-29T23:13:29.2549567Z  server stopped
+2026-07-29T23:13:29.2549767Z  
+2026-07-29T23:13:29.2550006Z  PostgreSQL init process complete; ready for start up.
+2026-07-29T23:13:29.2550310Z  
+2026-07-29T23:13:29.2556342Z Stop and remove container: 3cbac5b0af594a558431c29e99890143_postgres16_5be020
+2026-07-29T23:13:29.2561159Z ##[command]/usr/bin/docker rm --force 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:29.4167088Z 745a0b6d739eb69cc6009e48cbeb34cf128ddfa4d88c8e5dfadc5d0645c68d9a
+2026-07-29T23:13:29.4196851Z Remove container network: github_network_445673adf1644b63904e6265788e913b
+2026-07-29T23:13:29.4200932Z ##[command]/usr/bin/docker network rm github_network_445673adf1644b63904e6265788e913b
+2026-07-29T23:13:29.5360918Z github_network_445673adf1644b63904e6265788e913b
+2026-07-29T23:13:29.5430052Z Cleaning up orphan processes
+2026-07-29T23:13:29.5744572Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
