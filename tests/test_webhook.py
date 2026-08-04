@@ -9,6 +9,7 @@ import pytest
 from ci_triage.idempotency import IdempotencyStore
 from ci_triage.signature import InvalidSignature, MissingSignature, compute_signature
 from ci_triage.webhook import (
+    parse_ledger_run_id,
     ACCEPTED,
     DUPLICATE,
     IGNORED,
@@ -165,3 +166,29 @@ def test_headers_are_matched_case_insensitively(receiver):
     body, headers = _delivery(_payload())
     lowered = {k.lower(): v for k, v in headers.items()}
     assert receiver.receive(body, lowered).outcome == ACCEPTED
+
+
+# ------------------------------------------------ the ledger run id round trip
+
+
+def test_the_ledger_run_id_parses_back_into_its_parts(receiver):
+    """The job store keeps the run id and nothing else, so it has to be enough.
+
+    Formatting and parsing the same string is only safe while the format cannot
+    be ambiguous, which is what this pins: a repository full name, an integer
+    run id, an integer attempt, separated by markers that cannot appear inside
+    the repository name.
+    """
+    payload = _payload(run_id=42, run_attempt=3)
+    result = receiver.receive(*_delivery(payload))
+
+    assert parse_ledger_run_id(result.event.ledger_run_id) == ("octo/repo", 42, 3)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", "octo/repo", "octo/repo#42", "#42.1", "octo/repo#nan.1", "octo/repo#42.x"],
+)
+def test_a_run_id_that_is_not_one_is_rejected_rather_than_guessed(value):
+    with pytest.raises(ValueError):
+        parse_ledger_run_id(value)

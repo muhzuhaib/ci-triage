@@ -102,6 +102,33 @@ class ReceiveResult:
         return self.outcome == ACCEPTED
 
 
+def parse_ledger_run_id(value: str) -> tuple[str, int, int]:
+    """Recover ``(repo, run_id, run_attempt)`` from a ledger run id.
+
+    The state machine stores the ledger run id and nothing else, so the worker
+    that eventually does the fetching has to get the coordinates from somewhere.
+    The alternative is persisting the delivery payload beside the job, which
+    stores a large blob to answer three small questions and dates the moment
+    GitHub adds a field.
+
+    Parsing a string we also format is only safe while the format cannot be
+    ambiguous, so that is checked rather than assumed: a repository full name is
+    ``owner/repo`` and can contain neither ``#`` nor a dot outside its own
+    segments, the id and the attempt are integers, and the separators are split
+    from the right. A round-trip test guards the pair.
+    """
+    repo, sep, tail = value.rpartition("#")
+    if not sep or not repo:
+        raise ValueError(f"{value!r} is not a ledger run id: no '#'")
+    run_id, sep, attempt = tail.rpartition(".")
+    if not sep:
+        raise ValueError(f"{value!r} is not a ledger run id: no attempt")
+    try:
+        return repo, int(run_id), int(attempt)
+    except ValueError as exc:
+        raise ValueError(f"{value!r} is not a ledger run id: {exc}") from exc
+
+
 def _lower_headers(headers: Mapping[str, str]) -> dict[str, str]:
     """Header names are case-insensitive; ASGI/WSGI present them inconsistently."""
     return {k.lower(): v for k, v in headers.items()}
