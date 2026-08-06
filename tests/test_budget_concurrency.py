@@ -190,5 +190,68 @@ def test_the_naive_ledger_overspends__proving_this_test_has_teeth(engine):
     assert spend.reserved_micros == 160_000
     assert spend.reserved_micros > spend.ceiling_micros
     assert spend.committed_and_held > spend.ceiling_micros
-    assert spend.reserved_micros > spend.ceiling_micros
-    assert spend.committed_and_held > spend.ceiling_micros
+
+
+def test_workers_racing_to_reclaim_one_hold_give_it_back_exactly_once(ledger: Ledger):
+    """Reclaiming is a write against shared state, so it races like everything else.
+
+    Every worker that finds an abandoned hold wants to give the same money back,
+    and a ledger that let two of them do it would hand the run more budget than
+    it ever had. The ``state == HELD`` condition sits inside the ``UPDATE``, so
+    the row can only be moved once and only the mover subtracts.
+    """
+    ledger.open_run("r1", 100_000)
+    ledger.reserve("r1", 25_000, attempt=1, purpose="abandoned")
+    ledger.reserve("r1", 25_000, attempt=1, purpose="also abandoned")
+    ledger.reserve("r1", 10_000, attempt=2, purpose="live")
+
+    barrier = threading.Barrier(16)
+    returned: list[int] = []
+    lock = threading.Lock()
+
+    def reclaim(_i: int) -> None:
+        barrier.wait()
+        total = ledger.reclaim("r1", before_attempt=2)
+        with lock:
+            returned.append(total)
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        list(pool.map(reclaim, range(16)))
+
+    assert sum(returned) == 50_000, "the two dead holds came back, once each"
+    assert len([t for t in returned if t]) >= 1
+    spend = ledger.spend("r1")
+    assert spend.reserved_micros == 10_000, "and the live attempt kept its money"
+    assert spend.committed_and_held <= spend.ceiling_micros
+
+
+def test_a_commit_racing_the_reclaim_of_its_own_hold_is_recorded_once(ledger: Ledger):
+    """Whoever wins, the run is charged the real cost exactly once.
+
+    This is the paused-worker case at full speed: the reservation is being given
+    back at the same moment its owner is settling it. If the commit lands first
+    the reclaim finds nothing to take; if the reclaim lands first the commit is
+    recorded as an overrun. The two outcomes differ in what they say about *why*
+    the money went, which is the point of keeping them apart, but neither may
+    lose it or count it twice.
+    """
+    ledger.open_run("r1", 100_000)
+    reservation = ledger.reserve("r1", 30_000, attempt=1, purpose="diagnose")
+
+    barrier = threading.Barrier(2)
+
+    def committer() -> None:
+        barrier.wait()
+        ledger.commit(reservation, 12_000)
+
+    def reclaimer() -> None:
+        barrier.wait()
+        ledger.reclaim("r1", before_attempt=2)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(lambda fn: fn(), [committer, reclaimer]))
+
+    spend = ledger.spend("r1")
+    assert spend.spent_micros == 12_000, "charged once, whichever order it happened in"
+    assert spend.reserved_micros == 0, "and the hold is not given back twice"
+    assert spend.overrun_micros in (0, 12_000)
