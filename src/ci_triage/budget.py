@@ -34,6 +34,24 @@ The fix is that the check and the write are one statement. The ``WHERE`` clause
 carries the ceiling condition, so the database evaluates it against the row it
 is about to modify while holding the lock on that row. A reservation that would
 breach the ceiling matches zero rows, and a zero row count *is* the refusal.
+
+Why a hold has to be reclaimable
+--------------------------------
+Reserve-then-reconcile assumes the reserving process comes back to reconcile.
+A killed worker does not, and its hold would then stand for ever: the run's
+ceiling shrinks by the worst case of a call that may never have been made, and
+because retries share one ceiling, three crashes at that seam leave a run broke
+having spent nothing. ``tests/test_failure_injection.py`` is what found this,
+and it is why :meth:`Ledger.reclaim` exists -- the ``attempt`` a reservation
+already carries is the queue's fencing token, so a hold from an attempt earlier
+than the one now running provably belongs to a worker that no longer owns the
+job.
+
+That leaves one honest edge, and it is recorded rather than hidden. A worker can
+be merely paused rather than dead, so its call may land after its hold was
+reclaimed. :meth:`Ledger.commit` therefore still records that cost, in full, as
+an overrun: the money left the building outside the ceiling's protection, and a
+ledger that quietly dropped it would be balancing its books by losing evidence.
 """
 
 from __future__ import annotations
@@ -51,6 +69,11 @@ from .schema import reservations, run_budgets
 HELD = "held"
 COMMITTED = "committed"
 RELEASED = "released"
+#: Returned to the ceiling by someone other than the worker that took it, because
+#: that worker's attempt is over. Distinct from :data:`RELEASED` so the table
+#: still says which holds were given back and which were taken back, and so a
+#: late commit can be told apart from a repeated one.
+RECLAIMED = "reclaimed"
 
 
 class BudgetError(Exception):
@@ -229,6 +252,14 @@ class Ledger:
         visible rather than silently clamped. The stated guarantee is therefore
         about reservations, which are enforced, not about provider honesty,
         which cannot be.
+
+        A commit whose hold was :data:`RECLAIMED` while the worker was away is
+        still recorded, and the whole cost is an overrun. The hold that
+        authorised it has already gone back to the ceiling and may since have
+        been spent by the attempt that replaced this one, so there is nothing
+        left to charge it against. Dropping it would be the more comfortable
+        answer and the dishonest one: the money was spent, and the run's true
+        total is the thing this table exists to state.
         """
         if actual_micros < 0:
             raise ValueError("actual cost cannot be negative")
@@ -247,23 +278,80 @@ class Ledger:
                     settled_at=_now(),
                 )
             )
-            # Guard against double-settlement: only adjust the run totals if
-            # this call is the one that moved the reservation out of HELD.
-            if settled.rowcount == 0:
+            if settled.rowcount == 1:
+                conn.execute(
+                    update(run_budgets)
+                    .where(run_budgets.c.run_id == reservation.run_id)
+                    .values(
+                        reserved_micros=run_budgets.c.reserved_micros
+                        - reservation.held_micros,
+                        spent_micros=run_budgets.c.spent_micros + actual_micros,
+                        overrun_micros=run_budgets.c.overrun_micros + overrun,
+                    )
+                )
+                return
+
+            # Not held any more. Either this call is a repeat -- in which case
+            # the row is already COMMITTED or RELEASED and there is nothing to
+            # do -- or the hold was reclaimed and this is the late call landing
+            # after all. Only the second case matches, and it is the same rule
+            # as everywhere else here: the condition is inside the write.
+            late = conn.execute(
+                update(reservations)
+                .where(
+                    reservations.c.id == reservation.id,
+                    reservations.c.state == RECLAIMED,
+                )
+                .values(
+                    state=COMMITTED,
+                    actual_micros=actual_micros,
+                    settled_at=_now(),
+                )
+            )
+            if late.rowcount == 0:
                 return
 
             conn.execute(
                 update(run_budgets)
                 .where(run_budgets.c.run_id == reservation.run_id)
                 .values(
-                    reserved_micros=run_budgets.c.reserved_micros
-                    - reservation.held_micros,
                     spent_micros=run_budgets.c.spent_micros + actual_micros,
-                    overrun_micros=run_budgets.c.overrun_micros + overrun,
+                    overrun_micros=run_budgets.c.overrun_micros + actual_micros,
                 )
             )
 
-    def release(self, reservation: Reservation) -> None:
+    def _settle_hold(
+        self, reservation_id: str, run_id: str, held_micros: int, state: str
+    ) -> int:
+        """Move one HELD reservation to ``state`` and give the money back.
+
+        Returns what was actually returned to the ceiling, which is zero when
+        this call was not the one that moved the row. The ``state == HELD``
+        condition lives in the ``WHERE`` clause, so two callers racing to give
+        the same hold back cannot both subtract it.
+        """
+        with self._engine.begin() as conn:
+            settled = conn.execute(
+                update(reservations)
+                .where(
+                    reservations.c.id == reservation_id,
+                    reservations.c.state == HELD,
+                )
+                .values(state=state, actual_micros=0, settled_at=_now())
+            )
+            if settled.rowcount == 0:
+                return 0
+
+            conn.execute(
+                update(run_budgets)
+                .where(run_budgets.c.run_id == run_id)
+                .values(
+                    reserved_micros=run_budgets.c.reserved_micros - held_micros
+                )
+            )
+        return held_micros
+
+    def release(self, reservation: Reservation) -> int:
         """Return a held reservation to the run's budget, charging nothing.
 
         This is the path for a call that never reached the provider -- a
@@ -271,27 +359,50 @@ class Ledger:
         during setup. Releasing rather than committing zero keeps the
         distinction visible in the reservations table between "cost nothing"
         and "never happened".
+
+        Returns the micros returned to the ceiling, or zero if the reservation
+        was already settled.
+        """
+        return self._settle_hold(
+            reservation.id, reservation.run_id, reservation.held_micros, RELEASED
+        )
+
+    def reclaim(self, run_id: str, *, before_attempt: int) -> int:
+        """Give back every hold this run still carries from an earlier attempt.
+
+        A worker that is killed between :meth:`reserve` and :meth:`commit`
+        leaves its hold standing, and nothing in the ledger alone can tell that
+        hold apart from one belonging to a call still in flight. The queue can:
+        it hands a job to one worker at a time and increments ``attempt`` when
+        it does, so a hold recorded under an attempt *earlier* than the one now
+        running belongs to a worker that has already been replaced. Called at
+        the start of each attempt, this is what stops a crash from permanently
+        shrinking the ceiling.
+
+        The fencing token is what makes it safe, so the comparison is strictly
+        ``<``: the reservation this attempt is about to take is never in scope,
+        and neither is one taken by an attempt that has not been superseded.
+        It relies on a run having one job, which is what the receiver's
+        idempotency key -- run id *and* run attempt -- already guarantees.
+
+        Returns the total returned to the ceiling.
         """
         with self._engine.begin() as conn:
-            settled = conn.execute(
-                update(reservations)
-                .where(
-                    reservations.c.id == reservation.id,
+            stale = conn.execute(
+                select(reservations.c.id, reservations.c.held_micros).where(
+                    reservations.c.run_id == run_id,
                     reservations.c.state == HELD,
+                    reservations.c.attempt < before_attempt,
                 )
-                .values(state=RELEASED, actual_micros=0, settled_at=_now())
-            )
-            if settled.rowcount == 0:
-                return
+            ).all()
 
-            conn.execute(
-                update(run_budgets)
-                .where(run_budgets.c.run_id == reservation.run_id)
-                .values(
-                    reserved_micros=run_budgets.c.reserved_micros
-                    - reservation.held_micros
-                )
-            )
+        # The select above nominates; each write below decides. Same shape as
+        # the queue's claim, and for the same reason: another worker may be
+        # doing this at the same moment.
+        return sum(
+            self._settle_hold(row.id, run_id, row.held_micros, RECLAIMED)
+            for row in stale
+        )
 
     # ------------------------------------------------------------------ reads
 
