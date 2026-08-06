@@ -6,10 +6,17 @@ them, and it is deliberately the smallest module of the lot, because
 and the exactly-once bookkeeping. What is left here is the order of operations,
 and the order is the design::
 
-    coordinates -> failed jobs -> what can we afford -> fetch and truncate
+    coordinates -> reclaim a dead attempt's hold -> failed jobs
+                -> what can we afford -> fetch and truncate
                 -> reserve the worst case -> ask -> commit the truth -> post
 
-Three things in that sequence are load-bearing.
+Four things in that sequence are load-bearing.
+
+**The first act of an attempt is to undo the last one's crash.** A worker killed
+mid-attempt leaves a hold standing against the run's ceiling, and since retries
+share that one ceiling, a few crashes would leave the run unable to afford an
+answer it had never actually paid for. The queue's ``attempt`` counter is what
+makes this safe to do: see :meth:`~ci_triage.budget.Ledger.reclaim`.
 
 **The affordable size is computed before the log is fetched, not after.** It is
 the inversion :mod:`ci_triage.estimate` exists for: the service never asks "can
@@ -146,6 +153,14 @@ def run_triage(
         # A run id that does not parse will not start parsing on the third
         # attempt, so this is terminal rather than a transient read failure.
         raise TerminalError(str(exc)) from exc
+
+    # Before anything is read or spent: give back what an attempt that is over
+    # left held. A worker killed between reserving and settling cannot do this
+    # for itself, and its hold would otherwise shrink this run's ceiling for
+    # good -- which, since retries share one ceiling, is how a run goes broke
+    # having spent nothing. Done here rather than after the early return below,
+    # so a crash followed by a run with nothing to read still frees the money.
+    ledger.reclaim(job.run_id, before_attempt=job.attempt)
 
     failed = client.failed_jobs(repo, run_id, run_attempt=run_attempt)
     if not failed:
