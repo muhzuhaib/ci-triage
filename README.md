@@ -217,7 +217,36 @@ lands as an edit rather than a second opinion underneath the first.
 **The honest limitation:** find-then-create is a check-then-act race, and unlike the ledger and the
 queue there is no conditional write available to close it. What makes it safe in practice is the
 lease, which means one worker is doing this at a time. What the marker guarantees on its own is
-recovery, not exclusion.
+recovery, not exclusion. `tests/test_failure_injection.py` kills a worker at the two points where
+this would show, including the one where the comment reaches GitHub and the worker never learns its
+id, and asserts the pull request ends up with exactly one comment either way.
+
+## What is built: the failure-injection suite
+
+Every guarantee above was, until this point, proved by code that was allowed to finish. That is a
+weak kind of proof for a service whose promises are all about what happens when things break, so
+`tests/test_failure_injection.py` takes the finishing away: it kills the worker at each seam of a
+triage in turn, then lets the lease expire and a replacement take over, and checks the same four
+things every time.
+
+| The promise | How it is checked |
+|---|---|
+| One run, one comment | the fake GitHub keeps what was posted to it, so the count is of real state |
+| The ceiling holds | `spent + reserved <= ceiling` after the crash and the recovery |
+| No job is lost | the job ends `succeeded` or `dead_letter`, never stuck `running` |
+| No money is stranded | no reservation is left `held` by an attempt that is over |
+
+A kill is a `BaseException`, not an exception. `process_next` catches `Exception` and turns it into a
+retry or a burial, which is the handling path, not the crash path. Killing a worker with something
+catchable would test the error handler and call it a crash. What escapes instead leaves the job
+`running` with a live lease and nothing recorded, which is what a `SIGKILL` really leaves behind.
+
+**It found a defect on the first run, and the defect was in the ledger.** A worker killed between
+reserving and settling left its hold standing for ever. Nothing timed it out, and because retries
+share one ceiling, the run's budget ratcheted down with each crash until the job was dead-lettered
+for lack of money it had never spent. Nothing threw, nothing logged, and the ledger reported zero
+spent. That failure is kept as a control case, so the test that proves the fix has been seen to fail
+without it.
 
 ## Design decisions
 
@@ -266,6 +295,34 @@ cost, reserve it, call, then commit the real cost and release the remainder.
 Reserving the expected cost instead would be cheaper and wrong. An expected-cost reservation is
 breached by any call that runs long — which is exactly the call you wanted a ceiling for. The
 guarantee only means something if the reservation covers the bad case.
+
+### A hold has to be reclaimable, and the queue's fencing token is what makes that safe
+
+Reserve-then-reconcile assumes the reserving process comes back to reconcile. A killed one does not,
+and no timeout would help: a hold that has stood for five minutes looks exactly like a call that has
+been running for five minutes, and guessing wrong either strands the money or double-spends it.
+
+The queue already knows the answer. It hands a job to one worker at a time and increments `attempt`
+when it does, so a hold recorded under an attempt *earlier* than the one now running provably belongs
+to a worker that has been replaced. `Ledger.reclaim(run_id, before_attempt=...)` gives those back,
+and it is the first thing each attempt does. The comparison is strictly `<`: the attempt now running
+is never in scope, so the fix cannot rob the worker it exists to protect.
+
+### A reclaimed hold is marked, not deleted
+
+Reclaiming makes one thing possible that could not happen before: a worker can be merely paused
+rather than dead, so its call may land after its hold was taken back. `commit` still records that
+cost, in full, as an overrun. The money left the building outside what the ceiling authorised, and
+the alternative, dropping it because the hold that would have covered it is gone, would make the
+books balance by losing evidence.
+
+**The honest limitation, and it is the sharpest one in the project.** A worker killed between the
+provider answering and the commit landing spent money that nothing recorded, and no design recovers a
+fact that died with the process. So the ceiling bounds what the ledger *authorises*, and each crash
+at that one seam can cost up to one call's worth beyond it. What the ledger can do is refuse to
+pretend: the hold is not deleted, it is marked `reclaimed` with the attempt that took it, so every
+point at which the run may have paid without knowing is a row to go and look at. Reconciling against
+a provider invoice needs exactly that list.
 
 ### The check and the write are one statement
 
@@ -531,7 +588,7 @@ architecture is: gateway as the org-level backstop, per-run policy in the servic
 - [x] Webhook receiver with signature verification and idempotency keys
 - [x] Run state machine: retries with backoff, dead-letter queue, replay
 - [x] GitHub log fetch, log truncation to fit the ceiling, comment posting
-- [ ] Failure-injection suite: redelivery, worker kill, provider 429s, oversized logs _(planned)_
+- [x] Failure-injection suite: redelivery, worker kill, provider 429s, oversized logs
 - [ ] `docker compose up` _(planned)_
 
 ## Licence
