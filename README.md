@@ -9,11 +9,13 @@ The interesting part is not the LLM call. It is that the spend ceiling is a *gua
 hope, and that the comment is posted exactly once, even though webhooks are redelivered, workers
 crash mid-run, and providers rate-limit.
 
-> **Status:** early. Complete and tested: the budget ledger, the cost estimator that feeds it, the
-> webhook receiver that admits work (signature verification and exactly-once idempotency), the run
-> state machine that retries, buries and replays it, and the GitHub side that reads the failed jobs'
-> logs and posts the answer. The failure-injection suite is next. This README documents what exists;
-> sections marked _(planned)_ do not exist yet.
+> **Status:** the roadmap below is complete, at version 0.5.0. Built and tested: the budget ledger,
+> the cost estimator that feeds it, the webhook receiver that admits work (signature verification and
+> exactly-once idempotency), the run state machine that retries, buries and replays it, the GitHub
+> side that reads the failed jobs' logs and posts the answer, a failure-injection suite that kills the
+> worker at each seam, and a `docker compose up` stack that CI starts and posts real deliveries at.
+> The one thing you still supply is the provider call itself: this package chooses no vendor and
+> holds no API key, which is a design decision rather than a gap (see below).
 
 ## The problem
 
@@ -26,6 +28,49 @@ Three facts about this job, each of which breaks a naive implementation:
 | LLM providers rate-limit, time out, and return malformed output | Retries re-send a huge prompt. A retry storm costs 5× |
 
 Every mechanism in this repo exists because of one of those rows. Nothing is here for decoration.
+
+## Run it
+
+Two ways in, depending on whether you want to read the guarantees or watch them.
+
+**The tests, in under 60 seconds.** No services, no API keys, no network:
+
+```bash
+git clone https://github.com/muhzuhaib/ci-triage && cd ci-triage
+python -m pip install -e ".[dev]"
+python -m pytest
+```
+
+The ledger's only runtime dependency is SQLAlchemy, which is deliberate: the guarantees are the part
+worth verifying, so verifying them has to be free.
+
+**The service, on Postgres, in one command.** The receiver in front of the database it is meant to
+run on:
+
+```bash
+CI_TRIAGE_WEBHOOK_SECRET=hush docker compose up --build
+```
+
+The secret is required and has no default, because a default secret is a published one and an HMAC
+keyed by something everybody knows authenticates nobody. Compose stops with that message if it is
+unset.
+
+Then send it a delivery, signed the way GitHub signs them:
+
+```bash
+python tools/send_delivery.py --secret hush            # 202: queued for triage
+python tools/send_delivery.py --secret hush            # 200: a duplicate, nothing queued
+python tools/send_delivery.py --secret hush --unsigned # 401: not authenticated
+```
+
+`tools/send_delivery.py` is standard library only, so it runs anywhere without an install. The same
+three commands are the [CI job](.github/workflows/ci.yml) that verifies the stack on every push, and
+the last step of that job reads Postgres directly rather than trusting the status codes.
+
+**The triage worker is not in the compose file, on purpose.** It needs a GitHub token and a provider
+callable, and this package holds neither, so a worker service here could only ship a fake or fail on
+boot. Running one is the loop under [the GitHub side](#what-is-built-the-github-side): build a
+handler with your own `diagnose` and call `process_next` against the same database.
 
 ## What is built: the per-run spend ledger
 
@@ -137,17 +182,6 @@ What the machine guarantees, and how each guarantee is tested:
 | A hopeless failure is not retried three times first | failures classified retryable or terminal | `BudgetExceeded` goes straight to the queue |
 | Replay grants attempts, not money | `max_attempts` is raised; `attempt` and the ceiling are untouched | replay, then claim, then succeed |
 
-### Install and run the tests in under 60 seconds
-
-```bash
-git clone https://github.com/muhzuhaib/ci-triage && cd ci-triage
-python -m pip install -e ".[dev]"
-python -m pytest
-```
-
-No services, no API keys, no network. The ledger's dependency is SQLAlchemy and nothing else, which
-is deliberate — the guarantees are the part worth verifying, so verifying them has to be free.
-
 ## What is built: the GitHub side
 
 Reading the logs and posting the answer is where the budget stops being arithmetic and starts
@@ -248,7 +282,68 @@ for lack of money it had never spent. Nothing threw, nothing logged, and the led
 spent. That failure is kept as a control case, so the test that proves the fix has been seen to fail
 without it.
 
+## What is built: the deployable receiver
+
+`ci_triage.webhook` is a pure function, so `ci_triage.app` is the dozen lines its docstring promised:
+bytes and headers in, a status code out. Nothing decides anything there, which is why there is no
+logic in it to test twice. Two things in that path are more than plumbing.
+
+**Admission is two idempotent writes, and neither is the last word on its own.** Claiming the
+idempotency key and creating the job are separate statements. A process killed between them leaves a
+claimed key with no job: the delivery is remembered as seen, GitHub was told 202, and nothing will
+ever triage it, because the redelivery finds the key claimed and drops it. So the handler does not
+branch on first sight versus duplicate. It opens the run budget and enqueues the job either way, and
+both calls are idempotent by a database constraint rather than by a preceding read: `open_run` will
+not reset a partly spent ceiling, and `enqueue` is arbitrated by the unique index on
+`idempotency_key`. The repeat costs a rejected insert and buys recovery from a crash in the gap.
+`tests/test_app.py` makes the claim by hand without the job, which is exactly the state that crash
+leaves behind, and asserts the redelivery repairs it. Removing the repair fails that test and only
+that test.
+
+**Only a request we genuinely cannot use is answered with an error.** GitHub redelivers on any
+non-2xx, so returning 500 for an event we do not act on is a retry loop we caused. An unauthenticated
+body is 401 and a malformed one is 400, since redelivering either changes nothing. A green run, or an
+event we do not subscribe to, is 200 and goes no further.
+
+The health check is a query rather than a constant, because a receiver whose database is unreachable
+can still answer a static 200 and an orchestrator would go on sending it deliveries it cannot claim.
+A missing webhook secret kills the process at startup for the same reason: a service that boots
+without one looks healthy while refusing every delivery for the rest of the day.
+
 ## Design decisions
+
+### The container installs a wheel, not the source tree
+
+The Dockerfile builds in one stage and installs in another, and what crosses between them is a built
+wheel. Running out of a copied source tree would work, and it would also mean the image is the one
+artefact never installed the way a stranger installs it. Packaging mistakes are quiet: `prices.json`
+is data the package reads at runtime, and it was silently dropped from the wheel until
+`[tool.hatch.build.targets.wheel] artifacts` named it, which is the kind of thing an editable install
+hides right up to the first costed call. The extras are applied to the wheel path itself
+(`pip install "$wheel[service,postgres]"`) rather than listed again in the Dockerfile, so there is one
+declaration of what the service needs.
+
+### The compose file brings up Postgres, and waits for it properly
+
+SQLite would make the stack smaller and would also make it prove the wrong thing: every guarantee
+here is about concurrent writers, and SQLite serialises them. `depends_on` alone would not be enough
+either, since a Postgres container reports started well before it accepts connections, so the
+dependency is on `service_healthy` with `pg_isready` behind it.
+
+Schema creation at boot is behind `CI_TRIAGE_CREATE_SCHEMA` and off by default. Four tables with no
+migration history do not yet need Alembic, and pretending otherwise would add a migration directory
+with one revision in it that nobody has ever run backwards. Making it opt-in is what keeps that
+honest: when there is a schema to migrate rather than create, this becomes a migration step and the
+flag goes off.
+
+### CI is the only thing that has ever run the compose stack
+
+There is no Docker on the machine this was written on, which makes the compose file exactly the kind
+of claim this repo exists not to make. So the `docker` job does not stop at "the image builds": it
+brings the stack up, waits on the container's own health check, and posts real signed deliveries at
+it from outside the container with `tools/send_delivery.py`. Asserting on the status codes alone
+would still pass against a receiver that answered correctly and wrote nothing, so the final step
+queries Postgres and checks the exact set of jobs those six deliveries should have left behind.
 
 ### The log redirect is followed by hand, without the token
 
@@ -589,7 +684,7 @@ architecture is: gateway as the org-level backstop, per-run policy in the servic
 - [x] Run state machine: retries with backoff, dead-letter queue, replay
 - [x] GitHub log fetch, log truncation to fit the ceiling, comment posting
 - [x] Failure-injection suite: redelivery, worker kill, provider 429s, oversized logs
-- [ ] `docker compose up` _(planned)_
+- [x] `docker compose up`: the receiver on Postgres, started and exercised by CI on every push
 
 ## Licence
 
