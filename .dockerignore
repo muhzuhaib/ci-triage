@@ -1,0 +1,18 @@
+# The build stage copies exactly what it needs, so this list is a second line of
+# defence rather than the mechanism. It matters most for the .git directory: a
+# large context is slow to send to the daemon and lands in nothing useful.
+.git
+.github
+.gitignore
+.venv
+tests
+tools
+compose.yaml
+Dockerfile
+.dockerignore
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.db

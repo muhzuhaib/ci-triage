@@ -1,0 +1,50 @@
+# A local stack: Postgres, and the receiver in front of it.
+#
+# Postgres rather than SQLite because the guarantees this service makes are
+# guarantees about concurrent writers, and SQLite serialises them. Bringing up
+# the database people would actually deploy on is the point of the file.
+#
+# The triage worker is deliberately not here. It needs a GitHub token and a
+# provider callable, and this package chooses no vendor and holds no API key, so
+# a worker service in this file could only ship a fake or fail on boot. Running
+# one is a few lines you write against your own provider: see the README.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ci_triage
+    # The receiver waits on this, not on the container merely existing.
+    # A Postgres container reports "started" well before it accepts connections,
+    # and depends_on without a condition would race it on every cold start.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ci_triage"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  receiver:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Required, with no default. A default secret is a published secret, and
+      # an HMAC keyed by something everyone knows authenticates nobody. Compose
+      # refuses to start and prints this message if it is unset.
+      CI_TRIAGE_WEBHOOK_SECRET: ${CI_TRIAGE_WEBHOOK_SECRET:?set it to the secret you gave the GitHub webhook}
+      CI_TRIAGE_DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/ci_triage
+      CI_TRIAGE_CEILING_USD: ${CI_TRIAGE_CEILING_USD:-0.04}
+      # Four tables and no migration history yet, so the service creates its
+      # own schema at boot. This is a development convenience and it is opt-in
+      # for that reason: when there is a schema to migrate rather than create,
+      # this becomes a migration step and the flag goes off.
+      CI_TRIAGE_CREATE_SCHEMA: "1"
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
