@@ -48,3 +48,71 @@ jobs:
       - run: python -m pytest -q
         env:
           CI_TRIAGE_TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/ci_triage_test
+
+  # There is no Docker on the machine this is developed on, so this job is the
+  # only thing that has ever run the compose stack. A compose file nobody has
+  # started is a claim, not a feature -- so this does not stop at "the image
+  # builds": it brings the stack up and posts real signed deliveries at it from
+  # outside the container, then reads Postgres to check what they left behind.
+  docker:
+    name: docker compose up
+    runs-on: ubuntu-latest
+    env:
+      CI_TRIAGE_WEBHOOK_SECRET: integration-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image and start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for the receiver to report healthy
+        run: |
+          for _ in $(seq 1 60); do
+            if [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q receiver)")" = healthy ]; then
+              echo "receiver is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "receiver never became healthy"
+          exit 1
+
+      # The container's own health check already proves the app can reach
+      # Postgres, since /healthz runs a query rather than answering a constant.
+      - name: A failing run is accepted
+        run: python tools/send_delivery.py --secret "$CI_TRIAGE_WEBHOOK_SECRET" --expect 202
+
+      - name: The same delivery again is a duplicate, not a second job
+        run: python tools/send_delivery.py --secret "$CI_TRIAGE_WEBHOOK_SECRET" --expect 200
+
+      - name: A re-run of the same workflow run is separate work
+        run: python tools/send_delivery.py --secret "$CI_TRIAGE_WEBHOOK_SECRET" --attempt 2 --expect 202
+
+      - name: A green run is acknowledged and queues nothing
+        run: |
+          python tools/send_delivery.py --secret "$CI_TRIAGE_WEBHOOK_SECRET" \
+            --run-id 99 --conclusion success --expect 200
+
+      - name: An unsigned delivery is refused
+        run: python tools/send_delivery.py --secret "$CI_TRIAGE_WEBHOOK_SECRET" --unsigned --expect 401
+
+      - name: A delivery signed with the wrong secret is refused
+        run: python tools/send_delivery.py --secret not-the-secret --expect 401
+
+      # Asserting on the response codes alone would pass against a receiver that
+      # answered correctly and wrote nothing, so the last word is the database.
+      - name: Postgres holds exactly the jobs those deliveries should have made
+        run: |
+          rows=$(docker compose exec -T db psql -U postgres -d ci_triage -tAc \
+            "SELECT run_id FROM triage_jobs ORDER BY run_id")
+          echo "$rows"
+          expected=$'octo/repo#42.1\nocto/repo#42.2'
+          [ "$rows" = "$expected" ] || { echo "unexpected rows"; exit 1; }
+
+      - name: Show the logs when something above failed
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v
