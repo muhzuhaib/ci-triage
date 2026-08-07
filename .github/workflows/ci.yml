@@ -49,11 +49,11 @@ jobs:
         env:
           CI_TRIAGE_TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/ci_triage_test
 
-  # There is no Docker on the machine this is developed on, so this job is the
-  # only thing that has ever run the compose stack. A compose file nobody has
-  # started is a claim, not a feature -- so this does not stop at "the image
-  # builds": it brings the stack up and posts real signed deliveries at it from
-  # outside the container, then reads Postgres to check what they left behind.
+  # A compose file nobody has started is a claim, not a feature, so this job
+  # does not stop at "the image builds": it brings the stack up and posts real
+  # signed deliveries at it from outside the container, then reads Postgres to
+  # check what they left behind. Running it on every push is what keeps the
+  # quickstart in the README true rather than true when it was written.
   docker:
     name: docker compose up
     runs-on: ubuntu-latest

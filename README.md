@@ -336,14 +336,15 @@ with one revision in it that nobody has ever run backwards. Making it opt-in is 
 honest: when there is a schema to migrate rather than create, this becomes a migration step and the
 flag goes off.
 
-### CI is the only thing that has ever run the compose stack
+### CI starts the compose stack rather than checking that it builds
 
-There is no Docker on the machine this was written on, which makes the compose file exactly the kind
-of claim this repo exists not to make. So the `docker` job does not stop at "the image builds": it
-brings the stack up, waits on the container's own health check, and posts real signed deliveries at
-it from outside the container with `tools/send_delivery.py`. Asserting on the status codes alone
-would still pass against a receiver that answered correctly and wrote nothing, so the final step
-queries Postgres and checks the exact set of jobs those six deliveries should have left behind.
+A compose file nobody has started is a claim, not a feature, so the `docker` job does not stop at
+"the image builds": it brings the stack up, waits on the container's own health check, and posts real
+signed deliveries at it from outside the container with `tools/send_delivery.py`. Asserting on the
+status codes alone would still pass against a receiver that answered correctly and wrote nothing, so
+the final step queries Postgres and checks the exact set of jobs those six deliveries should have
+left behind. Running it on every push is what keeps the quickstart above true rather than true on the
+day it was written.
 
 ### The log redirect is followed by hand, without the token
 
