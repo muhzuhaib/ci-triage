@@ -54,7 +54,7 @@ from .webhook import (
 #
 #     from ci_triage.github import GitHubClient
 
-__version__ = "0.3.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "Backoff",
