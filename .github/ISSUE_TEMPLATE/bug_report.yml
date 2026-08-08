@@ -1,0 +1,65 @@
+name: Bug report
+description: Something behaves differently from what the README says it does.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two of this project's claims are absolute, so say so plainly if one of them broke: a
+        reservation went past the ceiling, or the same failure was commented on twice. Those outrank
+        everything else here.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, including the traceback or the log lines if there are any.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce it
+      description: >-
+        A failing test is the most useful form this can take. Otherwise, the smallest sequence of
+        steps that shows it. If it only happens sometimes, say roughly how often.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release, or the commit if you are running from a checkout.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      description: >-
+        SQLite serialises writers and can hide a race that Postgres exposes, so which one you were on
+        changes what the report means.
+      options:
+        - SQLite
+        - Postgres
+        - Both
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+    validations:
+      required: true

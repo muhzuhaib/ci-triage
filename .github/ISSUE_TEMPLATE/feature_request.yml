@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest something this service should do that it does not.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This service does one job: read a CI failure, ask an LLM about it, and post one comment for
+        at most a fixed amount of money. It is deliberately not a general workflow engine, so the
+        most useful thing you can tell me is the problem, not the feature.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what stops you today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried or considered instead
+      description: >-
+        Including anything outside this project. If an existing tool nearly solves it, saying where
+        it falls short is more useful than anything else in this form.
+    validations:
+      required: false
