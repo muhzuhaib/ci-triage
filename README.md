@@ -3,7 +3,7 @@
 [![CI](https://github.com/muhzuhaib/ci-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/muhzuhaib/ci-triage/actions/workflows/ci.yml)
 
 **A CI failure lands. A service reads the logs, asks an LLM what broke, and posts one comment on the
-pull request — for at most a fixed, guaranteed amount of money.**
+pull request, for at most a fixed, guaranteed amount of money.**
 
 The interesting part is not the LLM call. It is that the spend ceiling is a *guarantee* rather than a
 hope, and that the comment is posted exactly once, even though webhooks are redelivered, workers
@@ -23,7 +23,7 @@ Three facts about this job, each of which breaks a naive implementation:
 
 | Fact | What it breaks |
 |---|---|
-| CI logs are unbounded — a failing matrix job emits megabytes | Prompt cost is variable and can explode. "It's only a few cents per run" stops being true |
+| CI logs are unbounded: a failing matrix job emits megabytes | Prompt cost is variable and can explode. "It's only a few cents per run" stops being true |
 | GitHub redelivers webhooks; delivery is at-least-once | A duplicate run means a duplicate comment on someone's pull request |
 | LLM providers rate-limit, time out, and return malformed output | Retries re-send a huge prompt. A retry storm costs 5× |
 
@@ -131,8 +131,8 @@ receiver = WebhookReceiver(secret=WEBHOOK_SECRET, store=IdempotencyStore(engine)
 
 result = receiver.receive(raw_body_bytes, request_headers)
 if result.should_process:
-    triage(result.event)          # first sight of this failure — do the work
-# else: authenticated but a duplicate or not a failure — acknowledged, nothing scheduled
+    triage(result.event)          # first sight of this failure, so do the work
+# else: authenticated but a duplicate or not a failure; acknowledged, nothing scheduled
 ```
 
 `receive()` does three things in an order that is a security decision, not a convenience:
@@ -140,13 +140,13 @@ if result.should_process:
 1. **Authenticate the raw bytes**, before anything parses them. The HMAC is over the body exactly as
    sent, so verification runs on the received bytes and an unauthenticated body never reaches
    `json.loads`.
-2. **Filter to what we act on** — a `workflow_run` that *completed* with a failing conclusion.
+2. **Filter to what we act on**: a `workflow_run` that *completed* with a failing conclusion.
    Everything else is acknowledged with success and dropped, because GitHub redelivers on any non-2xx
    and returning an error for an event we do not care about would make it retry forever.
 3. **Claim exactly once**, so a redelivery is recognised and the comment is posted a single time.
 
 It is deliberately framework-agnostic: bytes and headers in, a decision out. Binding it to FastAPI or
-any ASGI server is a dozen lines that belong with the deployment — keeping the core a pure function is
+any ASGI server is a dozen lines that belong with the deployment. Keeping the core a pure function is
 what lets the whole admission path be tested in milliseconds with no server and no network.
 
 ## What is built: the run state machine
@@ -389,7 +389,7 @@ The ledger holds an *authorisation*, the same shape as a payment card hold: esti
 cost, reserve it, call, then commit the real cost and release the remainder.
 
 Reserving the expected cost instead would be cheaper and wrong. An expected-cost reservation is
-breached by any call that runs long — which is exactly the call you wanted a ceiling for. The
+breached by any call that runs long, which is exactly the call you wanted a ceiling for. The
 guarantee only means something if the reservation covers the bad case.
 
 ### A hold has to be reclaimable, and the queue's fencing token is what makes that safe
@@ -432,7 +432,7 @@ database evaluates it while holding the row lock, a reservation that would breac
 zero rows, and **a zero row count is the refusal**.
 
 `tests/test_budget_concurrency.py` races 16 threads at one ceiling. It also contains a deliberately
-naive check-then-act ledger and asserts that *it overspends* — because a concurrency test that has
+naive check-then-act ledger and asserts that *it overspends*, because a concurrency test that has
 never been observed to fail is not evidence of anything.
 
 ### "About 4 characters per token" is wrong for CI logs, by up to 4.6×
@@ -441,7 +441,7 @@ Every cost estimate eventually rests on a characters-to-tokens ratio, and the fi
 reaches for is ~4 chars/token. That is a number for **English prose**. CI logs are stack traces,
 absolute paths, hex digests, ISO timestamps and base64, and they tokenise far worse.
 
-Measured rather than assumed — reproduce with `python tools/measure_token_density.py`:
+Measured rather than assumed. Reproduce with `python tools/measure_token_density.py`:
 
 | Sample | chars/token (`o200k_base`) |
 |---|---|
@@ -454,8 +454,8 @@ Measured rather than assumed — reproduce with `python tools/measure_token_dens
 | base64 blob | 1.64 |
 | Docker `sha256:` layer digests | **1.18** |
 
-So on the worst realistic input, a 4.0 divisor understates the token count — and therefore the cost
-— by 4.6×, on precisely the payload this service was built to read. The table ships `1.18`, and
+So on the worst realistic input, a 4.0 divisor understates the token count, and therefore the cost,
+by 4.6×, on precisely the payload this service was built to read. The table ships `1.18`, and
 `0.90` for models on Anthropic's post-4.7 tokeniser, [which the vendor documents as emitting ~30%
 more tokens for the same text](https://platform.claude.com/docs/en/about-claude/pricing).
 
@@ -465,11 +465,11 @@ A worst-case ratio that pessimistic looks unusable: price a log at 1.18 and most
 for a bound that was merely cautious. That objection is real, and it is what makes the direction of
 the calculation the interesting decision here.
 
-The naive flow — take the log, estimate its cost, hope it fits — forces the estimate to be
+The naive flow, take the log, estimate its cost, hope it fits, forces the estimate to be
 *accurate*, which a character heuristic cannot be. So the service runs it backwards:
 `budget_input_chars()` asks **how much log can I afford?**, and the log is truncated to that.
 Now the pessimism costs a slightly shorter log instead of a refused run. The service never predicts
-the size of its input — it chooses it.
+the size of its input; it chooses it.
 
 That inversion is also what makes the bound honest. Both terms of the estimate are things the
 caller controls: the input was truncated to a length we picked, and `max_tokens` on the request is a
@@ -481,31 +481,31 @@ Three details in verifying GitHub's `X-Hub-Signature-256` are each a vulnerabili
 style preference:
 
 - **Over the raw bytes.** The HMAC covers the body exactly as sent. Parse-then-reserialise changes the
-  bytes — key order, whitespace, unicode escaping — so a signature checked against reserialised JSON
+  bytes: key order, whitespace, unicode escaping. So a signature checked against reserialised JSON
   never matches. This is also why authentication runs *before* `json.loads`: an unauthenticated body
   is not handed to a parser.
 - **Constant-time comparison.** A byte-by-byte `==` returns as soon as it finds a difference, leaking
-  through timing how many leading bytes were right — enough to forge a signature one byte at a time.
+  through timing how many leading bytes were right, enough to forge a signature one byte at a time.
   `hmac.compare_digest` exists to close exactly that oracle, and a test asserts the comparison goes
   through it so a refactor cannot quietly reintroduce `==`.
-- **An empty secret raises.** An unconfigured secret is not "no security", it is *forgeable* security —
+- **An empty secret raises.** An unconfigured secret is not "no security", it is *forgeable* security:
   anyone can compute an HMAC keyed by the empty string. Refusing to verify at all is safer.
 
 The legacy SHA-1 `X-Hub-Signature` header is rejected rather than accepted for compatibility; accepting
 it would let a caller downgrade the check to a broken hash.
 
-### Idempotency is keyed on the event, not the delivery — and the key includes the attempt
+### Idempotency is keyed on the event, not the delivery, and the key includes the attempt
 
 Exactly-once rests on the same move as the ledger: a single `INSERT` of the key is the claim, and the
 primary-key constraint arbitrates the race under the row lock. A read-first "have I seen this?" is the
-check-then-act double-post again, invisible to single-threaded tests — so
+check-then-act double-post again, invisible to single-threaded tests, so
 `tests/test_idempotency_concurrency.py` races real threads and carries a naive store as a control that
 double-claims, proving the harness has teeth.
 
 Two choices in *what* the key is made of:
 
 - **The event, not the envelope.** GitHub's `X-GitHub-Delivery` GUID is documented only as identifying
-  "the event", with no guarantee a redelivery reuses it — so keying on it could let a redelivery
+  "the event", with no guarantee a redelivery reuses it, so keying on it could let a redelivery
   through as new. The key is derived from what happened
   (`workflow_run:<repo>:<run_id>:<run_attempt>:<action>`), which is stable across redeliveries by
   construction, whatever the envelope does.
@@ -576,23 +576,23 @@ when each job got there, so replay is one state transition on the row that was a
 ### The price table is dated data, not constants in code
 
 `prices.json` carries `fetched_at` and a per-entry `source` URL, so "where did this number come from
-and when?" always has an answer. Prices are **strings**, never JSON numbers — `json.load` turns a
+and when?" always has an answer. Prices are **strings**, never JSON numbers, because `json.load` turns a
 bare `0.75` into a float, which would smuggle the imprecision back in one layer above the module
 that exists to prevent it.
 
 Stale and wrong are then treated differently, on purpose:
 
-- **Wrong** — an entry carries `price_expires` and that date has passed. The provider published the
+- **Wrong**: an entry carries `price_expires` and that date has passed. The provider published the
   change in advance, so we know as a fact the number is no longer the price. Pricing with it raises.
   There is a live example in the shipped table: Claude Sonnet 5's introductory rate is published as
   ending 2026-08-31.
-- **Stale** — the table as a whole is older than `stale_after_days`. That is a prompt to re-check,
+- **Stale**: the table as a whole is older than `stale_after_days`. That is a prompt to re-check,
   not evidence any particular number is wrong, so it sets a flag and blocks nothing.
 
 Failing hard on mere age takes a working service down over data hygiene. Failing soft on a price we
 know has changed silently under-charges every run. Neither policy is right for both cases.
 
-An unknown model raises rather than falling back to a default price — a default means the one model
+An unknown model raises rather than falling back to a default price, because a default means the one model
 we cannot cost is also the one we let through uncosted, which is how a ceiling stops being one.
 
 ### Money is an integer count of micro-dollars
@@ -601,14 +601,14 @@ Never a float, anywhere. A ceiling check is an inequality on a running total, an
 not associative: accumulate a few thousand fractional-cent charges and the total depends on the order
 they were added. A budget enforced to within a rounding error is not enforced.
 
-Micro-dollars rather than cents because per-token prices are far below a cent — at cent granularity
+Micro-dollars rather than cents because per-token prices are far below a cent: at cent granularity
 a realistic per-token price rounds to zero.
 
 ### An overrun is recorded, not clamped
 
 If a provider bills more than the worst case we estimated, the ledger records the true amount and
 increments a separate `overrun_micros` counter. Clamping to the reserved amount would keep the books
-tidy and hide the bug — a stale price table, or a provider ignoring `max_tokens`.
+tidy and hide the bug: a stale price table, or a provider ignoring `max_tokens`.
 
 This is also why the guarantee is stated precisely: **reservations never exceed the ceiling.** That
 is enforceable. "The provider never bills more than it said it would" is not, and claiming it would
@@ -637,14 +637,14 @@ Postgres needs neither. The tests run on both.
 |---|---|
 | Enforcing the budget in an AI gateway (LiteLLM, Bifrost, MLflow) | Gateways cap spend per key/team/tag over a **time window**. They have no concept of a run, so they cannot tell a retry of run A from the first attempt of run B. See below |
 | A token-count ceiling instead of a money ceiling | Tokens are not fungible across models. A ceiling in tokens silently changes value when the model changes |
-| Bundling a tokeniser to count input exactly | Per-provider, per-model, and several are not distributable at all — Anthropic's is not available offline. The service would fail closed for a reason unrelated to its job. `tiktoken` is used *once*, in `tools/`, to justify the ratio; it is not a dependency |
+| Bundling a tokeniser to count input exactly | Per-provider, per-model, and several are not distributable at all; Anthropic's is not available offline. The service would fail closed for a reason unrelated to its job. `tiktoken` is used *once*, in `tools/`, to justify the ratio; it is not a dependency |
 | A single global chars-per-token constant | The ratio differs by tokeniser generation by ~30%. It belongs in the price table next to the price, where it can be audited per model |
-| Optimistic budgeting — spend first, alert after | That is monitoring, not a ceiling. The bill has already happened |
+| Optimistic budgeting, spend first and alert after | That is monitoring, not a ceiling. The bill has already happened |
 | Building on n8n / Kestra | See below |
 
 ## Why not n8n?
 
-For a generic automation, use n8n — this is not a claim to have written a better workflow engine than
+For a generic automation, use n8n. This is not a claim to have written a better workflow engine than
 a funded team. The narrower claim is that the three properties *this* job needs are the three n8n
 does not provide, and assembling them inside n8n means writing the same logic anyway, in a visual
 editor where it cannot be unit-tested:
@@ -654,7 +654,7 @@ editor where it cannot be unit-tested:
    external Redis or Postgres gate.
 2. **Retry is per-node and capped** at 5 attempts with a 5000 ms delay ceiling, and on a multi-item
    node one failed item retries all of them.
-3. **No dead-letter queue primitive** — you assemble one from an Error Trigger, Continue On Fail and
+3. **No dead-letter queue primitive.** You assemble one from an Error Trigger, Continue On Fail and
    an IF node, and maintain it yourself.
 
 None of that makes n8n bad; those are the costs of being general. For this job those three things are
@@ -668,13 +668,14 @@ call, and at scale you would run one of them underneath this service. But their 
 may spend $200 this month" and structurally wrong for "this one run may spend 4 cents", because the
 gateway sees independent HTTP requests and cannot attribute a retry to a run.
 
-You *can* mint an ephemeral virtual key per run with `max_budget` set, and it genuinely works — at
+You *can* mint an ephemeral virtual key per run with `max_budget` set, and it genuinely works, at
 the cost of a key-lifecycle write per run with no automatic cleanup, and a budget that still resets
 on a duration rather than on run completion.
 
-More importantly, a gateway can only **refuse**. Deciding what happens when the ceiling is hit —
-truncate the log and retry cheaper, downgrade the model, post a partial answer, or dead-letter the
-run — is orchestration policy, and it belongs to the component that owns run identity. The honest
+More importantly, a gateway can only **refuse**. Deciding what happens when the ceiling is hit,
+whether that is truncating the log and retrying cheaper, downgrading the model, posting a partial
+answer, or dead-lettering the run, is orchestration policy, and it belongs to the component that
+owns run identity. The honest
 architecture is: gateway as the org-level backstop, per-run policy in the service.
 
 ## Roadmap
