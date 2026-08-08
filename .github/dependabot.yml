@@ -1,0 +1,28 @@
+version: 2
+
+updates:
+  # Actions pin themselves to a major tag, which keeps moving under us until a
+  # major is deprecated and CI starts warning. A monthly check is enough to
+  # catch that without a pull request every week.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "Update"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The runtime dependencies are few and deliberate. Grouping the development
+  # extras keeps a routine test-tooling bump to one pull request, while a
+  # runtime bump still arrives on its own where it can be read properly.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "Update"
+    groups:
+      dev-dependencies:
+        dependency-type: development
