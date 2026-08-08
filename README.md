@@ -688,6 +688,14 @@ architecture is: gateway as the org-level backstop, per-run policy in the servic
 - [x] Failure-injection suite: redelivery, worker kill, provider 429s, oversized logs
 - [x] `docker compose up`: the receiver on Postgres, started and exercised by CI on every push
 
+## Contributing
+
+Issues, questions and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) says what a good
+one looks like here, [CHANGELOG.md](CHANGELOG.md) records what changed in each release, and
+[SECURITY.md](SECURITY.md) covers what counts as a vulnerability and how to report one privately.
+Anything that is not yet a bug report or a concrete request belongs in
+[Discussions](https://github.com/muhzuhaib/ci-triage/discussions).
+
 ## Licence
 
 MIT
