@@ -89,6 +89,8 @@ def verify_signature(secret: str | bytes, body: bytes, signature_header: str | N
             f"signature header is not SHA-256 (expected a {PREFIX!r} prefix)"
         )
 
-    expected = compute_signature(key, body)
-    if not hmac.compare_digest(expected, signature_header):
+    # Compare bytes: header values arrive decoded as latin-1, so any byte can
+    # appear, and compare_digest refuses a str with non-ASCII characters.
+    expected = compute_signature(key, body).encode("ascii")
+    if not hmac.compare_digest(expected, signature_header.encode("utf-8")):
         raise InvalidSignature("signature does not match the request body")

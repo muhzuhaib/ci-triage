@@ -61,6 +61,13 @@ def test_a_legacy_sha1_header_is_refused():
         verify_signature(SECRET, BODY, sha1)
 
 
+def test_a_non_ascii_header_is_invalid_not_a_crash():
+    # Header values reach us decoded as latin-1, so any byte can arrive. A
+    # str compare_digest raises TypeError on non-ASCII, which escaped as a 500.
+    with pytest.raises(InvalidSignature):
+        verify_signature(SECRET, BODY, "sha256=é")
+
+
 def test_an_empty_secret_fails_closed():
     # A configuration error, not a request error: refuse rather than verify
     # against a key anyone can guess.

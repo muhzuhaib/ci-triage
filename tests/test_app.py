@@ -158,6 +158,16 @@ def test_a_delivery_signed_with_the_wrong_secret_is_rejected(client):
     assert _post(client, body, headers).status_code == 401
 
 
+def test_a_non_ascii_signature_header_is_rejected_and_queues_nothing(client, engine):
+    body, headers = _delivery(_payload(), sign=False)
+    headers["X-Hub-Signature-256"] = b"sha256=\xe9"
+    response = _post(client, body, headers)
+
+    assert response.status_code == 401
+    with engine.begin() as conn:
+        assert conn.execute(select(triage_jobs.c.id)).all() == []
+
+
 def test_an_authentic_body_that_is_not_json_is_four_hundred(client):
     body = b"{not json"
     headers = {

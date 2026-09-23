@@ -12,7 +12,11 @@ completed. Every version from 0.5.0 onward is tagged when it is released.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- An `X-Hub-Signature-256` header containing non-ASCII bytes is now refused with a 401, like any
+  other signature that does not match. The comparison runs on bytes, so every header value reaches
+  the constant-time check.
 
 ## [0.5.0] - 2026-08-07
 
