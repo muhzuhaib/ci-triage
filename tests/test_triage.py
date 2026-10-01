@@ -16,7 +16,7 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from ci_triage.budget import Ledger
+from ci_triage.budget import BudgetExceeded, Ledger
 from ci_triage.estimate import CallPlan
 from ci_triage.github import GitHubClient
 from ci_triage.money import dollars_to_micros
@@ -344,3 +344,39 @@ def test_a_rate_limit_reschedules_for_when_the_server_said(engine, ledger):
     # The computed backoff for attempt 1 is ~2 seconds. The server asked for 900,
     # and the scheduler has to take the larger, not the one it worked out itself.
     assert (job.next_attempt_at - moment).total_seconds() >= 900
+
+
+def test_a_budget_that_leaves_no_room_for_the_log_is_not_spent(engine, ledger):
+    """A reply to a prompt with no log in it is paid for and says nothing.
+
+    Between the smallest ceiling that can pay for an answer and the one that
+    also pays for the instruction, the log is cut to nothing. The diagnosis
+    would be charged and the comment would read "from 0 of N log characters".
+    """
+    calls = []
+
+    def counting_diagnosis(prompt: str, plan: CallPlan) -> Diagnosis:
+        calls.append(prompt)
+        return Diagnosis("ok", cost_micros=10)
+
+    store = JobStore(engine)
+    outcomes = []
+    for ceiling in range(3_600, 3_800, 5):
+        key = f"muhzuhaib/ci-triage#{ceiling}.1"
+        ledger.open_run(key, ceiling)
+        queued = store.enqueue(f"key-{ceiling}", key)
+        try:
+            outcome = run_triage(
+                queued,
+                client=client_for(api_handler()),
+                ledger=ledger,
+                price=PRICE,
+                diagnose=counting_diagnosis,
+            )
+        except (TerminalError, BudgetExceeded):
+            continue
+        outcomes.append(outcome)
+
+    assert outcomes, "the sweep never reached a diagnosis"
+    assert all(o.log.kept_chars > 0 for o in outcomes)
+    assert all(len(p) > 0 for p in calls)

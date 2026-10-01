@@ -183,6 +183,13 @@ def run_triage(
         LogSection(name=ref.name, text=client.job_log(repo, ref.id)) for ref in failed
     ]
     log = prepare_log(sections, max(0, affordable - len(instruction)))
+    if log.original_chars and not log.kept_chars:
+        # What the run can still afford covers the instruction and the job
+        # headers but not one line of the log. A reply to that would be paid
+        # for and have nothing to say, and a retry has the same ceiling.
+        raise TerminalError(
+            f"{job.run_id}: the remaining budget leaves no room for any of the log"
+        )
     prompt = instruction + log.text
 
     plan = plan_call_for_text(price, prompt, max_output_tokens=max_output_tokens)
