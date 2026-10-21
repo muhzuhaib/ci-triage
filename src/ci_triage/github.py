@@ -53,6 +53,7 @@ import re
 import time
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
@@ -149,8 +150,8 @@ def _retry_after_from(headers: Mapping[str, str], now: float | None = None) -> f
     """Read GitHub's documented rate-limit instruction out of the headers.
 
     Two forms, in the order the documentation gives them: ``retry-after`` in
-    seconds, and ``x-ratelimit-reset`` as a UTC epoch second, which applies when
-    ``x-ratelimit-remaining`` is ``0``.
+    seconds or an HTTP-date, and ``x-ratelimit-reset`` as a UTC epoch second,
+    which applies when ``x-ratelimit-remaining`` is ``0``.
     """
     lower = {k.lower(): v for k, v in headers.items()}
     raw = lower.get("retry-after")
@@ -158,7 +159,14 @@ def _retry_after_from(headers: Mapping[str, str], now: float | None = None) -> f
         try:
             return max(0.0, float(raw))
         except ValueError:
-            pass
+            try:
+                return max(
+                    0.0,
+                    parsedate_to_datetime(raw).timestamp()
+                    - (now if now is not None else time.time()),
+                )
+            except (ValueError, TypeError, OverflowError):
+                pass
     if lower.get("x-ratelimit-remaining") == "0":
         reset = lower.get("x-ratelimit-reset")
         if reset:
@@ -220,16 +228,17 @@ class GitHubClient:
 
         detail = f"{method} {url} -> {status}"
         if status in (403, 429):
-            # Both codes cover the primary and the secondary rate limit, which is
-            # why the headers decide rather than the code. A 403 with no
-            # rate-limit signal is a permissions problem, and no amount of
-            # waiting fixes a token that lacks the scope.
+            # A 429 always means rate limited. A 403 with no rate-limit signal
+            # is a permissions problem, and no amount of waiting fixes a token
+            # that lacks the scope.
             retry_after = _retry_after_from(response.headers)
             if retry_after is not None:
                 raise TransientGitHubError(
                     f"{detail} rate limited; retry after {retry_after:.0f}s",
                     retry_after_seconds=retry_after,
                 )
+            if status == 429:
+                raise TransientGitHubError(f"{detail} rate limited")
             if "secondary rate limit" in response.text.lower():
                 raise TransientGitHubError(f"{detail} secondary rate limit")
             raise PermanentGitHubError(f"{detail} forbidden: {response.text[:200]}")

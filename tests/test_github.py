@@ -9,6 +9,8 @@ it.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 
 import httpx
 import pytest
@@ -169,6 +171,32 @@ def test_a_rate_limited_response_carries_the_servers_own_retry_after():
         client_for(handler).failed_jobs("o/r", 1)
 
     assert caught.value.retry_after_seconds == 63.0
+
+
+def test_a_429_without_rate_limit_headers_is_transient():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="slow down")
+
+    with pytest.raises(TransientGitHubError) as caught:
+        client_for(handler).failed_jobs("o/r", 1)
+
+    assert caught.value.retry_after_seconds is None
+
+
+def test_a_429_with_an_http_date_retry_after_is_transient_and_waits_until_then(monkeypatch):
+    import ci_triage.github as gh
+
+    now = datetime(2026, 10, 21, 7, 26, 30, tzinfo=timezone.utc)
+    monkeypatch.setattr(gh.time, "time", lambda: now.timestamp())
+    retry_after = format_datetime(now + timedelta(seconds=90), usegmt=True)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, headers={"retry-after": retry_after}, text="slow down")
+
+    with pytest.raises(TransientGitHubError) as caught:
+        client_for(handler).failed_jobs("o/r", 1)
+
+    assert caught.value.retry_after_seconds == 90.0
 
 
 def test_an_exhausted_primary_limit_is_read_from_the_reset_header(monkeypatch):

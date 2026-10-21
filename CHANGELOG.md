@@ -14,6 +14,8 @@ completed. Every version from 0.5.0 onward is tagged when it is released.
 
 ### Fixed
 
+- A GitHub 429 is always retried, including one with no rate-limit headers, and a Retry-After
+  given as an HTTP-date is honoured. Such a 429 used to be dead-lettered on its first attempt.
 - An `X-Hub-Signature-256` header containing non-ASCII bytes is now refused with a 401, like any
   other signature that does not match. The comparison runs on bytes, so every header value reaches
   the constant-time check.
