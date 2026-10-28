@@ -43,7 +43,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .budget import Ledger
-from .estimate import BudgetTooSmall, CallPlan, budget_input_chars, plan_call_for_text
+from .estimate import CallPlan, EstimateError, budget_input_chars, plan_call_for_text
 from .github import GitHubClient, NoPullRequest
 from .github import marker_for
 from .logs import LogSection, PreparedLog, prepare_log
@@ -174,9 +174,10 @@ def run_triage(
         affordable = budget_input_chars(
             price, budget_micros=remaining, max_output_tokens=max_output_tokens
         )
-    except BudgetTooSmall as exc:
-        # Its own shortfall is on the output side, so a shorter log cannot fix
-        # it. Terminal for the same reason BudgetExceeded is.
+    except EstimateError as exc:
+        # A shortfall on the output side, or a price that leaves the input
+        # unbounded: a shorter log cannot fix either, and the next attempt reads
+        # the same price and ceiling. Terminal for the same reason BudgetExceeded is.
         raise TerminalError(str(exc)) from exc
 
     sections = [

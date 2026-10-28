@@ -318,6 +318,39 @@ def test_a_missing_repository_is_buried_without_burning_three_attempts(engine, l
     assert store.get(result.job.id).attempt == 1
 
 
+def test_a_zero_input_price_is_buried_without_burning_three_attempts(engine, ledger):
+    """A price table that says input is free is a config error, and it stays one.
+
+    The input cannot be bounded by cost, so the budget arithmetic refuses. Every
+    retry reads the same price and refuses again, so the job is buried on the
+    first attempt instead of using the whole retry allowance to learn that.
+    """
+    free_input = ModelPrice(
+        model="free-input",
+        provider="test",
+        input_per_mtok=Decimal("0"),
+        output_per_mtok=Decimal("5.00"),
+        chars_per_token=Decimal("1.18"),
+        source="test",
+    )
+    ledger.open_run(RUN_KEY, dollars_to_micros("0.05"))
+    store = JobStore(engine)
+    store.enqueue("workflow_run:muhzuhaib/ci-triage:42:1:completed", RUN_KEY)
+    handler = make_handler(
+        client=client_for(api_handler()),
+        ledger=ledger,
+        price=free_input,
+        diagnose=cheap_diagnosis,
+    )
+
+    result = process_next(store, handler, worker="worker-1")
+
+    assert result is not None
+    assert result.outcome == DEAD_LETTERED
+    assert store.get(result.job.id).attempt == 1
+    assert "zero input price" in store.get(result.job.id).last_error
+
+
 def test_a_rate_limit_reschedules_for_when_the_server_said(engine, ledger):
     """The server's retry-after wins over the local backoff schedule.
 
